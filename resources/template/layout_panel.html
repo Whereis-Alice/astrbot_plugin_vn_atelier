@@ -1,0 +1,19 @@
+{#- 面板：分组的标签值表格。用于帮助卡、收藏清单、缓存统计。 -#}
+{% if groups %}
+{% for g in groups %}
+      <div class="grp">
+        {% if g.name %}<h2 class="grp__name">{{ g.name | safe }}</h2>{% endif %}
+        {% for r in g.rows %}
+        <div class="row">
+          <div class="row__label">{{ r.label | safe }}</div>
+          <div class="row__value">{{ r.value | safe }}</div>
+        </div>
+        {% endfor %}
+      </div>
+{% endfor %}
+{% else %}
+      <div class="empty">暂无可展示的内容</div>
+{% endif %}
+{% if notes_html %}
+      <div class="notes">{{ notes_html | safe }}</div>
+{% endif %}

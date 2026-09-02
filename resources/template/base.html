@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1000, initial-scale=1">
+<title>VISUAL NOVEL ATELIER</title>
+<!--
+  骨架模板。渲染前 core/service/renderer.py 会做两次字符串替换：
+    样式占位（style 段首那行 CSS 注释）-> resources/theme/<主题>.css
+    正文占位（main 元素里那行 HTML 注释）-> resources/template/layout_<布局>.html
+  占位符字面量只允许在文件里各出现一次，所以这段说明刻意不写出它们。
+  下面这个字面量 astrbot-t2i-shiki-runtime 是刻意保留的：t2i 端点看到它
+  就会跳过注入 1.2MB 的代码高亮运行时，每张图都能省下这份体积。
+-->
+{{ font_css | safe }}
+<style>
+/*__THEME_CSS__*/
+
+/* ------------------------------------------------------------------ */
+/* 基础                                                                */
+/* ------------------------------------------------------------------ */
+:root { --vna-font: {{ font_family | safe }}; }
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { background: var(--bg); }
+
+body {
+  width: 1000px;
+  margin: 0 auto;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--vna-font);
+  font-size: 15px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+img { display: block; max-width: 100%; }
+
+/* ------------------------------------------------------------------ */
+/* 画布与纸面                                                          */
+/* ------------------------------------------------------------------ */
+.canvas {
+  position: relative;
+  padding: 34px;
+  overflow: hidden;
+}
+
+.deco {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.sheet {
+  position: relative;
+  overflow: hidden;
+  padding: 42px 44px 32px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.sheet::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--title-grad);
+  opacity: 0.85;
+}
+
+/* 四角的直角装饰线，来自视觉小说界面常见的画框感 */
+.cnr {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 0 solid var(--accent);
+  opacity: 0.7;
+}
+.cnr--tl { top: 12px; left: 12px; border-top-width: 2px; border-left-width: 2px; }
+.cnr--tr { top: 12px; right: 12px; border-top-width: 2px; border-right-width: 2px; }
+.cnr--bl { bottom: 12px; left: 12px; border-bottom-width: 2px; border-left-width: 2px; }
+.cnr--br { bottom: 12px; right: 12px; border-bottom-width: 2px; border-right-width: 2px; }
+
+/* ------------------------------------------------------------------ */
+/* 抬头                                                                */
+/* ------------------------------------------------------------------ */
+.hd { margin-bottom: 26px; }
+
+.hd__top {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 11px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.hd__mark {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+  transform: rotate(45deg);
+  box-shadow: 0 0 12px var(--glow);
+}
+
+.hd__brand { flex: 1 1 auto; }
+
+.hd__theme {
+  flex: 0 0 auto;
+  padding: 2px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--badge-bg);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+}
+
+.hd__title {
+  margin: 15px 0 0;
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0.015em;
+  background: var(--title-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.hd__sub {
+  margin: 9px 0 0;
+  font-size: 14px;
+  color: var(--ink-dim);
+  letter-spacing: 0.02em;
+}
+
+.rule {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 19px;
+}
+.rule i {
+  flex: 1 1 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--line), transparent);
+}
+.rule b {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  background: var(--accent-2);
+  transform: rotate(45deg);
+}
+
+/* ------------------------------------------------------------------ */
+/* 页脚                                                                */
+/* ------------------------------------------------------------------ */
+.foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 30px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink-dim);
+}
+.foot__stamp { font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------------ */
+/* 共用卡片                                                            */
+/* ------------------------------------------------------------------ */
+.card {
+  position: relative;
+  display: flex;
+  gap: 14px;
+  overflow: hidden;
+  padding: 12px 14px 12px 16px;
+  border: 1px solid var(--line-soft);
+  border-radius: 3px;
+  background: var(--surface-2);
+}
+.card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background: linear-gradient(180deg, var(--accent), transparent);
+  opacity: 0.7;
+}
+
+/* 封面跟着卡片高度伸缩，但夹在一个区间里：卡片文案长短不一时
+   既不会留白，也不会被拉成一条细长的竖条。 */
+.card__cover {
+  flex: 0 0 118px;
+  align-self: stretch;
+  width: 118px;
+  min-height: 148px;
+  max-height: 224px;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border: 1px solid var(--line-soft);
+  border-radius: 2px;
+  background: var(--bg);
+}
+
+.card__body { flex: 1 1 auto; min-width: 0; }
+
+.card__badge {
+  display: inline-block;
+  margin-bottom: 6px;
+  padding: 1px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--badge-bg);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+
+.card__title {
+  margin: 0 0 6px;
+  font-size: 16.5px;
+  font-weight: 700;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.card__desc {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--ink-dim);
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------------ */
+/* 共用备注与空态                                                      */
+/* ------------------------------------------------------------------ */
+.notes {
+  margin-top: 24px;
+  padding: 13px 16px;
+  border-left: 2px solid var(--accent);
+  border-radius: 0 3px 3px 0;
+  background: var(--surface-2);
+  font-size: 12.5px;
+  line-height: 1.95;
+  color: var(--ink-dim);
+}
+
+.empty {
+  padding: 46px 0;
+  border: 1px dashed var(--line);
+  border-radius: 3px;
+  text-align: center;
+  font-size: 14px;
+  letter-spacing: 0.12em;
+  color: var(--ink-dim);
+}
+
+/* ------------------------------------------------------------------ */
+/* 布局 gallery：等宽卡片双列                                           */
+/* ------------------------------------------------------------------ */
+.gal {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.gal--solo { grid-template-columns: minmax(0, 1fr); }
+.gal--solo .card { padding: 16px 18px 16px 20px; }
+.gal--solo .card__cover { flex-basis: 168px; width: 168px; }
+.gal--solo .card__title { font-size: 20px; }
+.gal--solo .card__desc { font-size: 14px; line-height: 1.95; }
+
+/* ------------------------------------------------------------------ */
+/* 布局 dossier：主视觉 + 分节                                          */
+/* ------------------------------------------------------------------ */
+.hero {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  margin-bottom: 24px;
+  padding: 16px;
+  border: 1px solid var(--line-soft);
+  border-radius: 3px;
+  background: var(--surface-2);
+}
+.hero__img {
+  flex: 0 0 250px;
+  width: 250px;
+  max-height: 310px;
+  object-fit: contain;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--bg);
+}
+.hero__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 15px;
+  line-height: 2;
+  overflow-wrap: anywhere;
+}
+
+.sec { margin-bottom: 22px; }
+.sec:last-child { margin-bottom: 0; }
+
+.sec__head {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 12px 16px;
+  border-left: 2px solid var(--accent);
+  border-radius: 0 3px 3px 0;
+  background: var(--surface-2);
+}
+.sec__img {
+  flex: 0 0 96px;
+  width: 96px;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border: 1px solid var(--line-soft);
+  border-radius: 2px;
+}
+.sec__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+.sec__cards--solo { grid-template-columns: minmax(0, 1fr); }
+
+.sec__cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+/* ------------------------------------------------------------------ */
+/* 布局 feature：大主视觉 + 简介 + 截图                                 */
+/* ------------------------------------------------------------------ */
+.ft-top { display: flex; gap: 24px; align-items: flex-start; }
+.ft-cover {
+  flex: 0 0 260px;
+  width: 260px;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.22);
+}
+.ft-main { flex: 1 1 auto; min-width: 0; padding-top: 2px; }
+.ft-name {
+  margin: 0 0 12px;
+  font-size: 25px;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.ft-info {
+  font-size: 14px;
+  line-height: 1.95;
+  color: var(--ink-dim);
+  overflow-wrap: anywhere;
+}
+
+.ft-desc {
+  position: relative;
+  margin-top: 22px;
+  padding: 16px 18px 16px 22px;
+  border: 1px solid var(--line-soft);
+  border-radius: 3px;
+  background: var(--surface-2);
+  font-size: 14px;
+  line-height: 2;
+  overflow-wrap: anywhere;
+}
+.ft-desc::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  left: 0;
+  width: 2px;
+  background: var(--accent);
+  opacity: 0.55;
+}
+
+.shots {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+.shots--duo { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.shots--solo { grid-template-columns: minmax(0, 1fr); }
+
+.shot {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border: 1px solid var(--line-soft);
+  border-radius: 2px;
+}
+
+/* ------------------------------------------------------------------ */
+/* 布局 panel：分组表格                                                */
+/* ------------------------------------------------------------------ */
+.grp { margin-bottom: 26px; }
+.grp:last-child { margin-bottom: 0; }
+
+.grp__name {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--accent);
+}
+.grp__name::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: linear-gradient(90deg, var(--line), transparent);
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  padding: 7px 2px;
+  border-bottom: 1px dashed var(--line-soft);
+}
+.row:last-child { border-bottom: 0; }
+.row__label {
+  flex: 0 0 300px;
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.row__value {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13.5px;
+  color: var(--ink-dim);
+  overflow-wrap: anywhere;
+}
+
+.ft-main > .ft-desc { margin-top: 18px; }
+
+.ft-cards-title { margin-top: 24px; }
+</style>
+</head>
+<body>
+<div class="canvas">
+  <div class="deco"></div>
+  <div class="sheet">
+    <span class="cnr cnr--tl"></span>
+    <span class="cnr cnr--tr"></span>
+    <span class="cnr cnr--bl"></span>
+    <span class="cnr cnr--br"></span>
+    <header class="hd">
+      <div class="hd__top">
+        <span class="hd__mark"></span>
+        <span class="hd__brand">{{ brand | safe }}</span>
+        {% if theme_label %}<span class="hd__theme">{{ theme_label | safe }}</span>{% endif %}
+      </div>
+      {% if title %}<h1 class="hd__title">{{ title | safe }}</h1>{% endif %}
+      {% if head_sub %}<p class="hd__sub">{{ head_sub | safe }}</p>{% endif %}
+      <div class="rule"><i></i><b></b><i></i></div>
+    </header>
+    <main class="bd">
+{#- 卡片是 gallery / dossier / feature 三个布局共用的组件，宏定义在这里，
+    各布局只管排版，不重复写一遍 DOM。desc 的换行由插件侧拼成 desc_html。 -#}
+{% macro vna_card(c) %}
+      <article class="card">
+        {% if c.image %}<img class="card__cover" src="{{ c.image | safe }}" alt="">{% endif %}
+        <div class="card__body">
+          {% if c.badge %}<span class="card__badge">{{ c.badge | safe }}</span>{% endif %}
+          {% if c.subtitle %}<h2 class="card__title">{{ c.subtitle | safe }}</h2>{% endif %}
+          {% if c.desc_html %}<div class="card__desc">{{ c.desc_html | safe }}</div>{% endif %}
+        </div>
+      </article>
+{% endmacro %}
+<!--__LAYOUT_BODY__-->
+    </main>
+    {% if show_footer %}
+    <footer class="foot">
+      <span>{{ footer | safe }}</span>
+      <span class="foot__stamp">{{ stamp | safe }}</span>
+    </footer>
+    {% endif %}
+  </div>
+</div>
+</body>
+</html>

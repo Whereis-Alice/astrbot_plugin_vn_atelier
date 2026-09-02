@@ -1,0 +1,30 @@
+{#- 档案：主视觉 + 若干小节。用于厂商档案、今日简讯、出处识别。
+    hero 只有出处识别会用到（放用户原图），厂商与简讯直接从小节开始。 -#}
+{% if hero %}
+      <div class="hero">
+        {% if hero.image %}<img class="hero__img" src="{{ hero.image | safe }}" alt="">{% endif %}
+        {% if hero.text_html %}<div class="hero__text">{{ hero.text_html | safe }}</div>{% endif %}
+      </div>
+{% endif %}
+{% if sections %}
+{% for s in sections %}
+      <section class="sec">
+        {% if s.header %}
+        <div class="sec__head">
+          {% if s.header.image %}<img class="sec__img" src="{{ s.header.image | safe }}" alt="">{% endif %}
+          {% if s.header.text_html %}<div class="sec__text">{{ s.header.text_html | safe }}</div>{% endif %}
+        </div>
+        {% endif %}
+        {% if s.cards %}
+        <div class="sec__cards{% if s.cards | length == 1 %} sec__cards--solo{% endif %}">
+{% for c in s.cards %}{{ vna_card(c) }}{% endfor %}
+        </div>
+        {% endif %}
+      </section>
+{% endfor %}
+{% elif not hero %}
+      <div class="empty">暂无可展示的内容</div>
+{% endif %}
+{% if notes_html %}
+      <div class="notes">{{ notes_html | safe }}</div>
+{% endif %}

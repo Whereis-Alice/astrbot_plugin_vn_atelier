@@ -1,0 +1,44 @@
+/* ==================================================================== */
+/* 墨影 noir —— 暗色主题                                                 */
+/*                                                                      */
+/* 近黑底 + 胶片颗粒 + 扫描线 + 暗角，强调色是朱红，第二强调色是旧纸的  */
+/* 米金。适合悬疑、猎奇向作品的卡片，也是四套里对比最强的一套。          */
+/* ==================================================================== */
+
+:root {
+  --bg: #0b0b0d;
+
+  --surface:
+    radial-gradient(circle at 89% -6%, rgba(224, 66, 79, 0.11), transparent 40%),
+    linear-gradient(168deg, rgba(27, 27, 31, 0.97), rgba(16, 16, 19, 0.97));
+  --surface-2: rgba(255, 255, 255, 0.042);
+
+  --line: rgba(216, 201, 168, 0.24);
+  --line-soft: rgba(216, 201, 168, 0.13);
+
+  --ink: #ececef;
+  --ink-dim: #9a9aa4;
+
+  --accent: #e0424f;
+  --accent-2: #d8c9a8;
+
+  --badge-bg: rgba(224, 66, 79, 0.13);
+  --glow: rgba(224, 66, 79, 0.50);
+
+  --title-grad: linear-gradient(96deg, #f2f2f4, #d8c9a8 56%, #e0424f);
+  --shadow: 0 20px 50px rgba(0, 0, 0, 0.74);
+}
+
+/* 暗角压在最上层，然后是扫描线、颗粒，最后是底色。 */
+.deco {
+  background:
+    radial-gradient(circle at 50% 40%, transparent 32%, rgba(0, 0, 0, 0.66) 100%),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.03) 0 1px, transparent 1px 4px),
+    radial-gradient(rgba(255, 255, 255, 0.16) 1px, transparent 1.5px) 0 0 / 7px 7px,
+    linear-gradient(180deg, #17171b, #0b0b0d 60%, #070708);
+}
+
+.hd__mark,
+.rule b {
+  box-shadow: 0 0 12px var(--glow);
+}

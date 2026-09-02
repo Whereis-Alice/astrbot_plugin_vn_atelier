@@ -1,0 +1,45 @@
+/* ==================================================================== */
+/* 青瓷 celadon —— 亮色主题                                              */
+/*                                                                      */
+/* 青瓷釉色 + 极淡的冰裂纹（两组交叉的斜向细线），强调色取窑变的青绿，  */
+/* 第二强调色取落款印泥旁的赭金。整体比樱色更冷、更安静。                */
+/* ==================================================================== */
+
+:root {
+  --bg: #e7eee9;
+
+  --surface:
+    radial-gradient(circle at 91% -8%, rgba(63, 143, 118, 0.11), transparent 42%),
+    radial-gradient(circle at 5% 108%, rgba(176, 141, 79, 0.09), transparent 42%),
+    linear-gradient(168deg, #fbfdfb, #f1f6f2);
+  --surface-2: rgba(63, 143, 118, 0.07);
+
+  --line: rgba(63, 143, 118, 0.30);
+  --line-soft: rgba(63, 143, 118, 0.16);
+
+  --ink: #22352d;
+  --ink-dim: #5d7a6c;
+
+  --accent: #3f8f76;
+  --accent-2: #b08d4f;
+
+  --badge-bg: rgba(63, 143, 118, 0.10);
+  --glow: rgba(63, 143, 118, 0.36);
+
+  --title-grad: linear-gradient(96deg, #2c7c62, #3f8f76 44%, #b08d4f);
+  --shadow: 0 16px 38px rgba(34, 53, 45, 0.14);
+}
+
+/* 冰裂纹：两组不同疏密、不同角度的 1px 细线交叉。 */
+.deco {
+  background:
+    repeating-linear-gradient(44deg, rgba(63, 143, 118, 0.08) 0 1px, transparent 1px 37px),
+    repeating-linear-gradient(-46deg, rgba(63, 143, 118, 0.06) 0 1px, transparent 1px 53px),
+    radial-gradient(circle at 7% 7%, rgba(176, 209, 190, 0.55), transparent 44%),
+    radial-gradient(circle at 94% 94%, rgba(213, 226, 199, 0.55), transparent 42%),
+    linear-gradient(180deg, #edf3ee, #e4ebe6);
+}
+
+.rule i {
+  background: linear-gradient(90deg, transparent, rgba(63, 143, 118, 0.38), transparent);
+}

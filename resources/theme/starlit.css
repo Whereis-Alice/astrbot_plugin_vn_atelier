@@ -1,0 +1,49 @@
+/* ==================================================================== */
+/* 星夜 starlit —— 默认主题                                              */
+/*                                                                      */
+/* 深蓝夜空底 + 两层疏密不同的星点 + 冷蓝与紫罗兰的双色辉光。            */
+/* 灵感来自视觉小说里最常见的那个场景：夜里的天台，屏幕上一行行独白。    */
+/* 全部用 CSS 渐变绘制，不含任何第三方素材。                             */
+/* ==================================================================== */
+
+:root {
+  --bg: #0a0d1a;
+
+  /* .sheet 的底：两道角落辉光叠在斜向渐变上，最后一层不透明。 */
+  --surface:
+    radial-gradient(circle at 92% -6%, rgba(126, 224, 255, 0.15), transparent 44%),
+    radial-gradient(circle at 4% 106%, rgba(183, 157, 255, 0.15), transparent 46%),
+    linear-gradient(168deg, rgba(24, 29, 58, 0.97), rgba(14, 17, 36, 0.97));
+  --surface-2: rgba(255, 255, 255, 0.05);
+
+  --line: rgba(126, 224, 255, 0.30);
+  --line-soft: rgba(162, 190, 255, 0.16);
+
+  --ink: #e9edff;
+  --ink-dim: #a6b1d6;
+
+  --accent: #7ee0ff;
+  --accent-2: #b79dff;
+
+  --badge-bg: rgba(126, 224, 255, 0.12);
+  --glow: rgba(126, 224, 255, 0.60);
+
+  --title-grad: linear-gradient(96deg, #8ee7ff, #b79dff 52%, #ffd0e8);
+  --shadow: 0 20px 52px rgba(3, 5, 16, 0.66);
+}
+
+/* 画布底纹：角落辉光 + 两层星点 + 由深到更深的夜空渐变。 */
+.deco {
+  background:
+    radial-gradient(circle at 15% 9%, rgba(126, 224, 255, 0.16), transparent 40%),
+    radial-gradient(circle at 85% 91%, rgba(183, 157, 255, 0.17), transparent 44%),
+    radial-gradient(rgba(255, 255, 255, 0.62) 1px, transparent 1.7px) 0 0 / 61px 61px,
+    radial-gradient(rgba(255, 255, 255, 0.30) 1px, transparent 1.5px) 27px 35px / 97px 97px,
+    linear-gradient(180deg, #10152f, #0a0d1a 58%, #07090f);
+}
+
+/* 暗色下给两处小菱形加一点辉光，让页眉不至于太平。 */
+.hd__mark,
+.rule b {
+  box-shadow: 0 0 12px var(--glow);
+}

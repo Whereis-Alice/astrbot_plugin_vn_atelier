@@ -1,0 +1,46 @@
+/* ==================================================================== */
+/* 樱色 sakura —— 亮色主题                                               */
+/*                                                                      */
+/* 米白纸面 + 淡粉柔光 + 散落的花瓣状虚影，金色作为第二强调色。          */
+/* 适合白天看、也适合截图发群，暗部比星夜浅得多。                        */
+/* ==================================================================== */
+
+:root {
+  --bg: #f6e9ea;
+
+  --surface:
+    radial-gradient(circle at 93% -8%, rgba(212, 114, 140, 0.11), transparent 42%),
+    radial-gradient(circle at 3% 106%, rgba(200, 162, 74, 0.10), transparent 44%),
+    linear-gradient(168deg, #fffbfb, #fdf2f3);
+  --surface-2: rgba(212, 114, 140, 0.07);
+
+  --line: rgba(190, 118, 138, 0.34);
+  --line-soft: rgba(190, 118, 138, 0.18);
+
+  --ink: #43272e;
+  --ink-dim: #8a6470;
+
+  --accent: #d4728c;
+  --accent-2: #c8a24a;
+
+  --badge-bg: rgba(212, 114, 140, 0.10);
+  --glow: rgba(212, 114, 140, 0.40);
+
+  --title-grad: linear-gradient(96deg, #c9587a, #d4728c 46%, #c19239);
+  --shadow: 0 16px 40px rgba(122, 70, 84, 0.16);
+}
+
+/* 两层大小不同的椭圆虚影当花瓣，错开铺陈避免看出网格。 */
+.deco {
+  background:
+    radial-gradient(circle at 10% 6%, rgba(234, 172, 192, 0.55), transparent 42%),
+    radial-gradient(circle at 92% 93%, rgba(240, 214, 170, 0.50), transparent 44%),
+    radial-gradient(ellipse 10px 5px at 50% 50%, rgba(226, 148, 174, 0.42), transparent 72%) 0 0 / 131px 97px,
+    radial-gradient(ellipse 7px 4px at 50% 50%, rgba(228, 168, 188, 0.34), transparent 72%) 63px 47px / 157px 119px,
+    linear-gradient(180deg, #fdf0f0, #f5e6e7);
+}
+
+/* 亮底上纯色分隔线偏硬，横向渐隐线换成更淡的粉。 */
+.rule i {
+  background: linear-gradient(90deg, transparent, rgba(190, 118, 138, 0.42), transparent);
+}

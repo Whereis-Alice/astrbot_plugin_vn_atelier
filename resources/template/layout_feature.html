@@ -1,0 +1,24 @@
+{#- 特写：大封面 + 信息栏 + 简介 + 游戏截图 + 附属卡片。
+    用于随机抽取、标签推荐、每日简讯推送。subtitle 是作品名或角色名，
+    在这里当正文大标题用，所以页眉不再重复输出（见 renderer 的 head_sub）。
+    简介排在右栏封面旁边而不是整幅下方：封面高度固定，简介长短不定，
+    这样短简介不会在封面右侧留下一大块空白。 -#}
+      <div class="ft-top">
+        {% if main_image %}<img class="ft-cover" src="{{ main_image | safe }}" alt="">{% endif %}
+        <div class="ft-main">
+          {% if subtitle %}<h2 class="ft-name">{{ subtitle | safe }}</h2>{% endif %}
+          {% if info_html %}<div class="ft-info">{{ info_html | safe }}</div>{% endif %}
+          {% if desc_html %}<div class="ft-desc">{{ desc_html | safe }}</div>{% endif %}
+        </div>
+      </div>
+{% if previews %}
+      <div class="shots{% if previews | length == 1 %} shots--solo{% elif previews | length == 2 %} shots--duo{% endif %}">
+        {% for shot in previews %}<img class="shot" src="{{ shot | safe }}" alt="">{% endfor %}
+      </div>
+{% endif %}
+{% if cards %}
+      {% if cards_title %}<h3 class="grp__name ft-cards-title">{{ cards_title | safe }}</h3>{% endif %}
+      <div class="gal{% if cards | length == 1 %} gal--solo{% endif %}">
+{% for c in cards %}{{ vna_card(c) }}{% endfor %}
+      </div>
+{% endif %}

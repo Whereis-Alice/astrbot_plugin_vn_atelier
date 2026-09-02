@@ -1,0 +1,87 @@
+# metadata.yaml 里的 version 一变动，就按 CHANGELOG.md 里对应的小节建一个 Release。
+name: Auto Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "metadata.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 读取版本号
+        id: version
+        run: |
+          version=$(python3 - <<"PY"
+          import re, pathlib
+          text = pathlib.Path("metadata.yaml").read_text(encoding="utf-8")
+          match = re.search(r"^version:\s*([^\s#]+)", text, re.MULTILINE)
+          print(match.group(1) if match else "")
+          PY
+          )
+          if [ -z "$version" ]; then
+            echo "::error::metadata.yaml 里没有找到 version" && exit 1
+          fi
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+          echo "版本号：$version"
+
+      - name: 检查 Release 是否已存在
+        id: existing
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "Release $VERSION 已存在，跳过。"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 抽取更新日志
+        if: steps.existing.outputs.found == 'false'
+        id: notes
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          python3 - <<"PY" > notes.md
+          import os, pathlib, re
+
+          version = os.environ["VERSION"]
+          fallback = "详见 CHANGELOG.md。"
+          path = pathlib.Path("CHANGELOG.md")
+          body = ""
+          if path.exists():
+              pattern = (
+                  r"^## \[" + re.escape(version) + r"\][^\n]*\n(.*?)(?=^## \[|\Z)"
+              )
+              match = re.search(pattern, path.read_text(encoding="utf-8"), re.S | re.M)
+              if match:
+                  body = match.group(1).strip()
+          print(body or fallback)
+          PY
+          {
+            echo "body<<CHANGELOG_EOF"
+            cat notes.md
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "--- release notes ---"
+          cat notes.md
+          rm -f notes.md
+
+      - name: 建立 Release
+        if: steps.existing.outputs.found == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.value }}
+          name: ${{ steps.version.outputs.value }}
+          body: ${{ steps.notes.outputs.body }}
+          generate_release_notes: false

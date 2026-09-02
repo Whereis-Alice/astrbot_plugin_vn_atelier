@@ -1,0 +1,412 @@
+{
+  "basicSetting": {
+    "description": "通用设置",
+    "type": "object",
+    "items": {
+      "requestRetries": {
+        "description": "单次请求最大尝试次数",
+        "hint": "图片或数据经常下载失败时可以适当调高。每次重试都会等待递增的间隔，调得过高会明显拉长响应时间。",
+        "type": "int",
+        "slider": {
+          "min": 1,
+          "max": 10,
+          "step": 1
+        },
+        "default": 5
+      },
+      "requestTimeout": {
+        "description": "单次请求超时（秒）",
+        "hint": "一次网络请求最长等待时间。网络较慢或走代理时建议 45 秒以上。",
+        "type": "int",
+        "slider": {
+          "min": 5,
+          "max": 180,
+          "step": 5
+        },
+        "default": 30
+      },
+      "sessionTimeout": {
+        "description": "会话等待超时（秒）",
+        "hint": "推荐、出处等指令会等待你的下一条消息（例如回复「下一个」或直接发图）。超过这个时间就自动结束会话。",
+        "type": "int",
+        "slider": {
+          "min": 10,
+          "max": 300,
+          "step": 10
+        },
+        "default": 60
+      },
+      "cleanOnRestart": {
+        "description": "重载插件时清空图片缓存",
+        "hint": "开启后每次重载或更新插件都会删除下载好的封面图，下一次查询会重新联网抓取。除排查问题外一般不需要开启。",
+        "type": "bool",
+        "default": false
+      },
+      "forwardLimit": {
+        "description": "合并转发单条包含的消息数",
+        "hint": "下载资源等多条结果会尝试用合并转发发送，单条转发包含太多内容容易被平台拒收。0 表示不拆分。",
+        "type": "int",
+        "slider": {
+          "min": 0,
+          "max": 200,
+          "step": 5
+        },
+        "default": 10
+      },
+      "resourceLimit": {
+        "description": "下载资源最多展示条数",
+        "hint": "「工房 下载」一次最多列出多少个资源，0 表示全部列出。",
+        "type": "int",
+        "slider": {
+          "min": 0,
+          "max": 100,
+          "step": 1
+        },
+        "default": 0
+      },
+      "textFallback": {
+        "description": "渲染失败时退回纯文本",
+        "hint": "强烈建议保持开启。图片渲染依赖 AstrBot 的截图服务，一旦不可用，插件会把同样的内容用纯文本发出来，而不是直接报错。",
+        "type": "bool",
+        "default": true
+      }
+    }
+  },
+  "renderSetting": {
+    "description": "外观与渲染",
+    "hint": "决定输出图片长什么样。改完主题后可直接用「工房 主题」指令预览。",
+    "type": "object",
+    "items": {
+      "theme": {
+        "description": "配色主题",
+        "hint": "星夜=深蓝夜空，樱色=淡粉暖调，青瓷=素雅冷绿，墨影=高对比黑金。",
+        "type": "string",
+        "options": [
+          "starlit-星夜",
+          "sakura-樱色",
+          "celadon-青瓷",
+          "noir-墨影"
+        ],
+        "default": "starlit-星夜"
+      },
+      "fontSource": {
+        "description": "字体来源",
+        "hint": "在线字体使用 CDN 上的霞鹜文楷，观感最好但需要渲染服务能访问外网；系统字体不联网，样式取决于宿主机已安装的字体；不指定则完全交给浏览器默认值。",
+        "type": "string",
+        "options": [
+          "cdn-在线字体（推荐）",
+          "system-系统字体",
+          "none-不指定"
+        ],
+        "default": "cdn-在线字体（推荐）"
+      },
+      "fontUrl": {
+        "description": "在线字体 CSS 地址",
+        "hint": "仅在字体来源为「在线字体」时生效，必须是 http/https 开头的 CSS 链接。CDN 被墙时可换成国内镜像，或把字体来源改为系统字体。",
+        "type": "string",
+        "default": "https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css"
+      },
+      "fontFamily": {
+        "description": "字体名称",
+        "hint": "写在 CSS font-family 首位的名字，需与上面字体文件里声明的名称一致。用系统字体时可填「Microsoft YaHei」「Noto Sans SC」等本机已装的字体。",
+        "type": "string",
+        "default": "LXGW WenKai"
+      },
+      "renderQuality": {
+        "description": "图片质量",
+        "hint": "JPEG 压缩质量。90 以上细节清晰但文件更大，60 左右体积最小、发图更快。",
+        "type": "int",
+        "slider": {
+          "min": 40,
+          "max": 100,
+          "step": 1
+        },
+        "default": 92
+      },
+      "showFooter": {
+        "description": "显示页脚",
+        "hint": "在图片底部显示数据来源与生成时间。",
+        "type": "bool",
+        "default": true
+      }
+    }
+  },
+  "safetySetting": {
+    "description": "网络与内容分级",
+    "hint": "除目标站点自身故障外，连接问题多半出在这一栏。",
+    "type": "object",
+    "items": {
+      "enableNSFW": {
+        "description": "允许 R18 内容",
+        "hint": "关闭时会过滤掉成人向作品与图片。开启前请确认所在群聊允许此类内容；TouchGal 侧还需要填写下面的 Token 才会真正返回 R18 资源。",
+        "type": "bool",
+        "default": false
+      },
+      "proxy": {
+        "description": "代理地址",
+        "hint": "只作用于本插件，例如 http://127.0.0.1:7897。支持 http/https/socks5。缺少协议前缀会被忽略并在日志中提醒。",
+        "type": "string",
+        "default": ""
+      },
+      "touchgalToken": {
+        "description": "TouchGal 登录 Token",
+        "hint": "下载指令用来登录 TouchGal。取法：浏览器登录 https://www.touchgal.top/ 后，在 Cookie 里复制 kun-galgame-patch-moe-token 的值。留空则只能看到公开资源。",
+        "type": "string",
+        "default": ""
+      },
+      "cfClearance": {
+        "description": "Cloudflare cf_clearance",
+        "hint": "可选。当 TouchGal 返回 403 或人机验证页面时填这一项，同样从浏览器 Cookie 里复制 cf_clearance。安装 curl_cffi 后大多数情况不需要填。",
+        "type": "string",
+        "default": ""
+      },
+      "tls": {
+        "description": "TLS 浏览器指纹",
+        "hint": "curl_cffi 用来伪装的浏览器版本标识，例如 chrome136、chrome131、safari17_0。填了不支持的值会自动退回默认请求方式。",
+        "type": "string",
+        "default": "chrome136"
+      }
+    }
+  },
+  "characterSetting": {
+    "description": "角色卡设置",
+    "type": "object",
+    "items": {
+      "characterOptions": {
+        "description": "角色卡附加信息",
+        "hint": "勾选的项目在数据存在时才会显示。「性别（含剧透）」会揭示 VNDB 标注的真实性别，可能构成剧透，请谨慎勾选。",
+        "type": "list",
+        "options": [
+          "a-血型",
+          "b-身高/体重",
+          "c-性别（不剧透）",
+          "d-性别（含剧透）",
+          "e-三围",
+          "f-罩杯"
+        ],
+        "default": [
+          "a-血型",
+          "b-身高/体重",
+          "c-性别（不剧透）"
+        ]
+      }
+    }
+  },
+  "producerSetting": {
+    "description": "厂商卡设置",
+    "type": "object",
+    "items": {
+      "producerVns": {
+        "description": "每个厂商展示的作品数",
+        "hint": "按贝叶斯评分降序取前 N 部，0 表示全部。数量越多联网抓图越慢，也更容易渲染超时，建议保持默认。",
+        "type": "int",
+        "slider": {
+          "min": 0,
+          "max": 100,
+          "step": 3
+        },
+        "default": 9
+      }
+    }
+  },
+  "rankingSetting": {
+    "description": "排行榜设置",
+    "type": "object",
+    "items": {
+      "rankingResults": {
+        "description": "榜单展示条数",
+        "hint": "「工房 排行」一次列出多少部作品。",
+        "type": "int",
+        "slider": {
+          "min": 3,
+          "max": 24,
+          "step": 1
+        },
+        "default": 12
+      },
+      "rankingMinVotes": {
+        "description": "最低投票数门槛",
+        "hint": "过滤掉票数过少的作品，避免冷门作品凭个别高分冲榜。想看小众作品可以调低。",
+        "type": "int",
+        "slider": {
+          "min": 0,
+          "max": 10000,
+          "step": 50
+        },
+        "default": 100
+      }
+    }
+  },
+  "recommendSetting": {
+    "description": "推荐设置",
+    "type": "object",
+    "items": {
+      "recommendCache": {
+        "description": "推荐预取数量",
+        "hint": "一次网络请求取回并提前渲染多少部作品，回复「下一个」时直接从缓存里发，几乎没有等待。调高会增加首次请求耗时。",
+        "type": "int",
+        "slider": {
+          "min": 1,
+          "max": 12,
+          "step": 1
+        },
+        "default": 5
+      }
+    }
+  },
+  "findSetting": {
+    "description": "出处识别设置",
+    "type": "object",
+    "items": {
+      "findResults": {
+        "description": "每个检测框的候选数",
+        "hint": "识图时每张脸列出最相似的前几个角色。",
+        "type": "int",
+        "slider": {
+          "min": 1,
+          "max": 10,
+          "step": 1
+        },
+        "default": 3
+      }
+    }
+  },
+  "eventSetting": {
+    "description": "简讯设置",
+    "type": "object",
+    "items": {
+      "eventRating": {
+        "description": "作品质量门槛",
+        "hint": "历史上的今天只统计贝叶斯评分不低于此值的作品及其登场角色。调低会让内容变多但质量参差。",
+        "type": "int",
+        "slider": {
+          "min": 0,
+          "max": 100,
+          "step": 5
+        },
+        "default": 75
+      },
+      "eventStartYear": {
+        "description": "回溯起始年份",
+        "hint": "只统计该年份之后发售的作品。想翻更早的老作品可以往前调。",
+        "type": "int",
+        "slider": {
+          "min": 1970,
+          "max": 2100,
+          "step": 1
+        },
+        "default": 1990
+      }
+    }
+  },
+  "scheduleSetting": {
+    "description": "每日推送",
+    "hint": "每天定时推送「历史上的今天」发售的作品与今日生日角色。也可以在群里用「工房 推送 开启」自助订阅。",
+    "type": "object",
+    "items": {
+      "pushTime": {
+        "description": "推送时间",
+        "hint": "24 小时制，格式 HH:MM，例如 07:00。填错格式会自动退回 07:00 并在日志中提醒。",
+        "type": "string",
+        "default": "07:00"
+      },
+      "scheduleContent": {
+        "description": "选取作品的口味",
+        "hint": "决定当天挑哪一部作品作为主角：评分优先容易挑到票数很少的冷门高分作，热度优先偏向大众名作，第三项是两者的折中。",
+        "type": "string",
+        "options": [
+          "a-评分优先",
+          "b-热度优先",
+          "c-评分优先（排除冷门）"
+        ],
+        "default": "c-评分优先（排除冷门）"
+      },
+      "genderFilter": {
+        "description": "生日角色性别筛选",
+        "hint": "推送今日生日角色时是否限制性别。",
+        "type": "string",
+        "options": [
+          "a-只要女性角色",
+          "b-只要男性角色",
+          "c-不筛选"
+        ],
+        "default": "c-不筛选"
+      },
+      "useSubscription": {
+        "description": "启用群聊自助订阅",
+        "hint": "开启后管理员可以在群里用「工房 推送 开启/关闭」自行订阅，订阅结果会持久保存。关闭则只推送下面的白名单。",
+        "type": "bool",
+        "default": true
+      },
+      "pushList": {
+        "description": "推送白名单",
+        "hint": "手动指定要推送的会话，每行一条，格式「平台id-群聊id」，例如 aiocqhttp-123456789。平台id 就是 AstrBot 里适配器的名称。留空表示只用自助订阅。",
+        "type": "list",
+        "default": []
+      }
+    }
+  },
+  "cacheSetting": {
+    "description": "缓存管理",
+    "hint": "封面图会缓存到插件数据目录，重复查询无需再次联网。可用「工房 缓存」查看占用，「工房 缓存 清理」手动清空。",
+    "type": "object",
+    "items": {
+      "maxSizeMB": {
+        "description": "磁盘缓存上限（MB）",
+        "hint": "超出后按最久未使用顺序删除旧文件，0 表示不限制。",
+        "type": "int",
+        "slider": {
+          "min": 0,
+          "max": 4096,
+          "step": 32
+        },
+        "default": 256
+      },
+      "ttlDays": {
+        "description": "缓存有效期（天）",
+        "hint": "超过这个天数没被用到的图片会在清理时删除，0 表示永不过期。",
+        "type": "int",
+        "slider": {
+          "min": 0,
+          "max": 365,
+          "step": 1
+        },
+        "default": 14
+      },
+      "memoryEntries": {
+        "description": "内存缓存条数",
+        "hint": "在内存里额外保留最近使用的图片，命中时连磁盘都不用读。0 表示关闭内存缓存。",
+        "type": "int",
+        "slider": {
+          "min": 0,
+          "max": 512,
+          "step": 8
+        },
+        "default": 64
+      }
+    }
+  },
+  "limitSetting": {
+    "description": "限流与扩展",
+    "type": "object",
+    "items": {
+      "cooldownSeconds": {
+        "description": "同一用户指令冷却（秒）",
+        "hint": "防止刷屏。冷却期内的重复指令会被静默忽略，0 表示不限制。",
+        "type": "int",
+        "slider": {
+          "min": 0,
+          "max": 120,
+          "step": 1
+        },
+        "default": 3
+      },
+      "enableLlmTools": {
+        "description": "开放给大模型调用",
+        "hint": "开启后把作品检索、角色检索、随机作品注册为函数工具，聊天中的大模型可以自行调用它们来查资料。会增加模型的工具数量与上下文开销。",
+        "type": "bool",
+        "default": false
+      }
+    }
+  }
+}

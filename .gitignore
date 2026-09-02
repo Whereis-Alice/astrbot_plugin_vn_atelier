@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 工具缓存
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+
+# 编辑器
+.idea/
+.vscode/
+
+# 运行期产物（插件数据目录由 AstrBot 统一管理，不在仓库内）
+data/
+*.log
+
+# 系统
+.DS_Store
+Thumbs.db

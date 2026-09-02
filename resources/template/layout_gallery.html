@@ -1,0 +1,9 @@
+{#- 画廊：等宽卡片双列。用于作品/角色检索、评分排行、ID 查询。
+    只有一张卡时切成单列大卡，避免右半边留一片空白。 -#}
+{% if cards %}
+      <div class="gal{% if cards | length == 1 %} gal--solo{% endif %}">
+{% for c in cards %}{{ vna_card(c) }}{% endfor %}
+      </div>
+{% else %}
+      <div class="empty">暂无可展示的内容</div>
+{% endif %}

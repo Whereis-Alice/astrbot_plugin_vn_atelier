@@ -1,0 +1,59 @@
+# Lint configuration for astrbot_plugin_vn_atelier.
+#
+# Mirrors the rule set used across this author"s AstrBot plugins: fairly wide,
+# minus the checks that fight the plugin architecture (broad "never crash the
+# bot" excepts, local-time display strings, full-width punctuation in Chinese
+# copy, ...).
+
+target-version = "py310"
+line-length = 100
+extend-exclude = ["data", "__pycache__"]
+
+[lint]
+select = [
+    "E",      # pycodestyle
+    "W",
+    "F",      # pyflakes
+    "I",      # isort
+    "UP",     # pyupgrade
+    "B",      # bugbear
+    "C4",     # comprehensions
+    "SIM",    # simplify
+    "RET",    # return
+    "PTH",    # pathlib
+    "PIE",
+    "RUF",
+    "ASYNC",
+    "A",      # builtin shadowing
+    "BLE",    # blind except
+    "DTZ",    # naive datetime
+    "T20",    # stray print()
+]
+ignore = [
+    "E501",    # long CJK strings in help text are fine
+    "SIM105",  # contextlib.suppress hides which call may fail
+    "SIM115",
+    "RUF001",  # full-width punctuation is intentional in Chinese copy
+    "RUF002",
+    "RUF003",
+    "RET504",  # a named result is often clearer than an inline return
+    "B008",
+    "A003",
+    "A004",    # astrbot.api.event.filter is the framework"s public name
+    "ASYNC240", # AstrBot runs on asyncio, not trio/anyio
+    # 插件跑在 AstrBot 进程内：任何漏出的异常都会打断宿主的事件分发，所以每一处
+    # 外部 IO（网络、磁盘、平台 API、第三方库）都刻意兜底成降级路径并记日志。
+    # asyncio.CancelledError 在需要的地方都单独重抛，不会被这些兜底吞掉。
+    "BLE001",
+    # 图片与文案里的日期一律按宿主本机时区展示，附加 tzinfo 只会引入 UTC 偏移。
+    "DTZ001",
+    "DTZ005",
+]
+
+[lint.per-file-ignores]
+# 自检脚本自带一个迷你 runner，PASS/FAIL 必须直接打到 stdout。
+"tests/*" = ["T201"]
+
+[format]
+quote-style = "double"
+indent-style = "space"
