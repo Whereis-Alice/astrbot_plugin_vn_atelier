@@ -10,6 +10,15 @@ from __future__ import annotations
 from .enums import CommandType
 
 
+def _label(command: CommandType | str) -> str:
+    """取指令名。
+
+    异常都在错误路径上构造，本身绝不能再抛异常，所以这里同时容忍枚举与字符串
+    ——调用点少写一个 .value 不该把「没搜到结果」变成一条 AttributeError。
+    """
+    return command.value if isinstance(command, CommandType) else str(command)
+
+
 class Tips(Exception):
     """可以直接告知用户的业务异常基类。"""
 
@@ -25,22 +34,22 @@ class EarlyReturn(Tips):
 class InvalidArgsException(Tips):
     """指令参数格式不合法。"""
 
-    def __init__(self, command: CommandType, value: str) -> None:
-        super().__init__(f"指令参数错误：{command.value}-{value}")
+    def __init__(self, command: CommandType | str, value: str) -> None:
+        super().__init__(f"指令参数错误：{_label(command)}-{value}")
 
 
 class SessionTimeoutException(Tips):
     """等待用户后续输入超时。"""
 
-    def __init__(self, command: CommandType, value: str) -> None:
-        super().__init__(f"等待结果超时，指令失效：{command.value}-{value}")
+    def __init__(self, command: CommandType | str, value: str) -> None:
+        super().__init__(f"等待结果超时，指令失效：{_label(command)}-{value}")
 
 
 class ArgsOrNullException(Tips):
     """参数不合法，或按该参数找不到任何结果。"""
 
-    def __init__(self, command: CommandType, value: str) -> None:
-        super().__init__(f"参数错误或结果不存在：{command.value}-{value}")
+    def __init__(self, command: CommandType | str, value: str) -> None:
+        super().__init__(f"参数错误或结果不存在：{_label(command)}-{value}")
 
 
 class InternetException(Tips):
@@ -48,6 +57,22 @@ class InternetException(Tips):
 
     def __init__(self, url: str) -> None:
         super().__init__(f"请求网络失败：{url}，请检查【安全配置】是否错误")
+
+
+class ChallengeException(Tips):
+    """目标站点开启了浏览器验证（Cloudflare 挑战等），请求无法直接通过。
+
+    与 InternetException 的区别很重要：网络抖动重试有用，浏览器验证重试没用。
+    挑战要求客户端执行一段 JavaScript 再把结果交回去，伪装 TLS 指纹或换个
+    User-Agent 都答不上来，只能换出口 IP、带上有效的 cf_clearance，或者让
+    真实浏览器（FlareSolverr）替你答一次。所以命中挑战时插件会直接停手并
+    熔断该站点一段时间，而不是白跑满重试次数、刷满日志。
+    """
+
+    def __init__(self, host: str, detail: str = "") -> None:
+        super().__init__(
+            f"{host} 开启了浏览器验证，暂时取不到数据，可稍后再试：challenge-{host}-{detail}"
+        )
 
 
 class AuthorityException(Tips):
@@ -69,8 +94,8 @@ class ResponseException(Tips):
 class NoResultException(Tips):
     """检索成功但没有命中任何内容。"""
 
-    def __init__(self, command: CommandType, value: str) -> None:
-        super().__init__(f"未搜索到合适内容：{command.value}-{value}")
+    def __init__(self, command: CommandType | str, value: str) -> None:
+        super().__init__(f"未搜索到合适内容：{_label(command)}-{value}")
 
 
 class NoCacheException(Tips):

@@ -112,16 +112,37 @@
         "type": "string",
         "default": "LXGW WenKai"
       },
+      "renderScale": {
+        "description": "清晰度",
+        "hint": "决定截图的像素密度，相当于给渲染页面装一块高分屏。卡片排版宽度固定为 1000 像素，输出宽度即 1000 乘以倍率：标准 1000 px、高清 1300 px、超清 1800 px（文字边缘最锐利，文件也最大）。若渲染服务版本较老、不认这个参数，插件会自动退回标准画质并在日志里提示。",
+        "type": "string",
+        "options": [
+          "normal-标准（1x）",
+          "high-高清（1.3x，推荐）",
+          "ultra-超清（1.8x）"
+        ],
+        "default": "high-高清（1.3x，推荐）"
+      },
+      "renderFormat": {
+        "description": "图片格式",
+        "hint": "JPEG 体积小、发送快，是绝大多数场景的正确选择；PNG 无损、文字边缘最干净，但实测同一张长卡片会从约 700 KB 涨到约 2.8 MB，部分平台会二次压缩甚至拒收大图。",
+        "type": "string",
+        "options": [
+          "jpeg-JPEG（体积小，推荐）",
+          "png-PNG（无损）"
+        ],
+        "default": "jpeg-JPEG（体积小，推荐）"
+      },
       "renderQuality": {
         "description": "图片质量",
-        "hint": "JPEG 压缩质量。90 以上细节清晰但文件更大，60 左右体积最小、发图更快。",
+        "hint": "JPEG 压缩质量，格式选 PNG 时不生效。95 左右是画质与体积的平衡点；低于 80 会在文字边缘看到明显噪点。",
         "type": "int",
         "slider": {
           "min": 40,
           "max": 100,
           "step": 1
         },
-        "default": 92
+        "default": 95
       },
       "showFooter": {
         "description": "显示页脚",
@@ -148,21 +169,33 @@
         "type": "string",
         "default": ""
       },
+      "touchgalBase": {
+        "description": "TouchGal 站点地址",
+        "hint": "TouchGal 换域名时改这里即可，无需等插件更新（历史上从 touchgal.top 换到过 touchgal.ink）。必须以 http:// 或 https:// 开头。",
+        "type": "string",
+        "default": "https://www.touchgal.ink/"
+      },
       "touchgalToken": {
         "description": "TouchGal 登录 Token",
-        "hint": "下载指令用来登录 TouchGal。取法：浏览器登录 https://www.touchgal.top/ 后，在 Cookie 里复制 kun-galgame-patch-moe-token 的值。留空则只能看到公开资源。",
+        "hint": "下载指令用来登录 TouchGal。取法：浏览器登录 https://www.touchgal.ink/ 后，在 Cookie 里复制 kun-galgame-patch-moe-token 的值。留空则只能看到公开资源。",
         "type": "string",
         "default": ""
       },
       "cfClearance": {
         "description": "Cloudflare cf_clearance",
-        "hint": "可选。当 TouchGal 返回 403 或人机验证页面时填这一项，同样从浏览器 Cookie 里复制 cf_clearance。安装 curl_cffi 后大多数情况不需要填。",
+        "hint": "可选。TouchGal 开启浏览器验证（日志出现「浏览器验证」或 403）时可填这一项，从浏览器 Cookie 里复制 cf_clearance 的值。注意：它与「取得它的出口 IP + 当时的浏览器 UA」绑定，从自己电脑复制到远程服务器通常无效，必须在与 AstrBot 同一出口的网络环境下获取。",
+        "type": "string",
+        "default": ""
+      },
+      "solverUrl": {
+        "description": "浏览器验证求解服务",
+        "hint": "可选，填 FlareSolverr 的地址，例如 http://127.0.0.1:8191。它内部跑真实浏览器，是唯一能自动通过 Cloudflare JS 验证的办法。必须与 AstrBot 共用同一出口 IP（一般装在同一台机器上），否则取回的凭证无效。留空则关闭该功能。",
         "type": "string",
         "default": ""
       },
       "tls": {
         "description": "TLS 浏览器指纹",
-        "hint": "curl_cffi 用来伪装的浏览器版本标识，例如 chrome136、chrome131、safari17_0。填了不支持的值会自动退回默认请求方式。",
+        "hint": "curl_cffi 用来伪装的浏览器版本标识，例如 chrome136、chrome131、safari17_0。它能绕过按客户端指纹拦截的风控，但绕不过需要执行 JavaScript 的验证页。填了不支持的值会自动退回默认请求方式。",
         "type": "string",
         "default": "chrome136"
       }

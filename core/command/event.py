@@ -37,7 +37,7 @@ class EventCommand(BaseCommand):
         date = [str(now.year), f"{month:02d}", f"{day:02d}"]
         vns, characters = await self.runtime.vndb.request_by_event(date)
         if not vns and not characters:
-            raise NoResultException(self.command.value, f"{month}-{day}")
+            raise NoResultException(self.command, f"{month}-{day}")
 
         blocks = []
         if vns:

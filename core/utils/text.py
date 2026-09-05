@@ -8,6 +8,10 @@ from collections.abc import Iterable
 _FULLWIDTH_COLON = "："
 _BLANK_LINES = re.compile(r"\n{2,}")
 
+_SPOILER = re.compile(r"\[spoiler\].*?\[/spoiler\]", re.IGNORECASE | re.DOTALL)
+_LINK = re.compile(r"\[url=[^\]]*\](.*?)\[/url\]", re.IGNORECASE | re.DOTALL)
+_MARKUP = re.compile(r"\[/?[a-zA-Z]+(?:=[^\]]*)?\]")
+
 
 def brief(error: BaseException | str) -> str:
     """取异常消息中「用户可见描述」的部分。
@@ -42,6 +46,20 @@ def join_cn(items: Iterable[object] | None, separator: str = "、") -> str:
     if not items:
         return ""
     return separator.join(str(i).strip() for i in items if str(i).strip())
+
+
+def plain_markup(text: str | None) -> str:
+    """把 VNDB 简介里的标记语法还原成纯文本。
+
+    VNDB 的 description 用的是自家一套 BBCode 风格标记（[url=..]、[b]、
+    [spoiler] 等）。原样展示会满屏方括号，所以这里把链接压成文字、把其余
+    标记去掉；剧透块则整段丢弃——随手抽一部作品不该顺带被剧透。
+    """
+    if not text:
+        return ""
+    cleaned = _SPOILER.sub("", text)
+    cleaned = _LINK.sub(r"\1", cleaned)
+    return _MARKUP.sub("", cleaned).strip()
 
 
 def clip(text: str, limit: int, ellipsis: str = "…") -> str:

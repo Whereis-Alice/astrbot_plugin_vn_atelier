@@ -8,6 +8,7 @@ VNDB 的查询都是「POST 一个 filters + fields 的 JSON」，因此这里�
 from __future__ import annotations
 
 import asyncio
+import random
 from collections.abc import Sequence
 from typing import Any
 
@@ -33,6 +34,13 @@ _BIRTHDAY_POOL = 40
 
 _MAX_RESULTS = 100
 """VNDB 单次查询的结果上限。"""
+
+_RANDOM_PAGE_SIZE = 25
+_RANDOM_PAGES = 40
+"""随机抽取的候选池：25 × 40 = 前 1000 部热门作品，VNDB 允许翻到这个深度。"""
+
+_RANDOM_MIN_VOTES = 50
+"""随机抽取的投票数下限，避免抽到只有个位数评价的冷门条目。"""
 
 
 class Vndb:
@@ -187,6 +195,43 @@ class Vndb:
         }
         results = await self._results("vn", payload, CommandType.RANKING, label)
         return [VndbVnResponse.model_validate(item) for item in results]
+
+    # -- 随机抽取 ---------------------------------------------------------- #
+
+    async def request_random_vn(self) -> VndbVnResponse:
+        """随机抽一部有一定知名度的作品。
+
+        VNDB 没有随机接口，这里的做法是先用投票数门槛滤掉几乎没人玩过的
+        条目，再在「按投票数排序的前若干页」里随机翻一页、随机取一条。
+        投票数门槛顺带把翻页深度限制在 VNDB 允许的范围内。
+
+        这条链路是随机指令的备选数据源：TouchGal 开启浏览器验证、或干脆
+        换了域名时，指令仍然能出结果，而不是直接报错。
+        """
+        votes = max(self._settings.ranking.min_votes, _RANDOM_MIN_VOTES)
+        payload: dict[str, Any] = {
+            "filters": ["votecount", ">=", votes],
+            "fields": VNDB_FIELDS["vn"],
+            "sort": "votecount",
+            "reverse": True,
+            "results": _RANDOM_PAGE_SIZE,
+            "page": random.randint(1, _RANDOM_PAGES),
+            "count": True,
+        }
+        data = await self._post("vn", payload)
+        results = data.get("results") or []
+
+        if not results:
+            # 用户把投票门槛调得很高时候选可能不足 40 页，按实际总数重挑一页。
+            total = int(data.get("count") or 0)
+            pages = max(1, min(_RANDOM_PAGES, -(-total // _RANDOM_PAGE_SIZE)))
+            payload["page"] = random.randint(1, pages)
+            payload.pop("count", None)
+            results = await self._results_or_empty("vn", payload)
+
+        if not results:
+            raise NoResultException(CommandType.RANDOM, "随机作品")
+        return VndbVnResponse.model_validate(random.choice(results))
 
     # -- 纪念日 / 每日推送 -------------------------------------------------- #
 

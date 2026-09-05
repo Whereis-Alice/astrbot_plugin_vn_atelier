@@ -56,6 +56,8 @@ class Renderer:
         self._base: str | None = None
         self._layouts: dict[Layout, str] = {}
         self._themes: dict[Theme, str] = {}
+        self._degraded = False
+        """对端拒收过清晰度参数时置位，后续直接用兼容参数，不再白跑一次。"""
 
     # -- 模板装配 ---------------------------------------------------------- #
 
@@ -94,6 +96,7 @@ class Renderer:
 
     def invalidate(self) -> None:
         """清空模板缓存。切换主题或热更新资源文件后调用。"""
+        self._degraded = False
         self._cache.clear()
         self._base = None
         self._layouts.clear()
@@ -190,20 +193,36 @@ class Renderer:
         except Exception as error:
             raise RenderException(f"模板资源不可用（{error}）") from error
 
+        render = self._settings.render
+        safe = render.safe_options
+        wanted = options or (safe if self._degraded else render.render_options)
+
         try:
-            url = await html_renderer.render_custom_template(
-                template,
-                payload,
-                return_url=True,
-                options=options or self._settings.render.render_options,
-            )
+            url = await self._shoot(template, payload, wanted)
         except Exception as error:
-            logger.error("%s 渲染 %s 布局失败：%s", _LOG, layout.value, error)
-            raise RenderException(str(error)) from error
+            if wanted == safe:
+                logger.error("%s 渲染 %s 布局失败：%s", _LOG, layout.value, error)
+                raise RenderException(str(error)) from error
+            # 清晰度参数（scale / device_scale_factor_level / viewport_width）只有
+            # 较新的 t2i 服务认；老服务或公共端点可能直接拒收整个请求。这里退一步
+            # 用最小参数集重试，宁可图小一点也不能整条指令没有输出。
+            logger.warning("%s 高清参数被渲染服务拒绝（%s），本次会话改用兼容参数", _LOG, error)
+            self._degraded = True
+            try:
+                url = await self._shoot(template, payload, safe)
+            except Exception as again:
+                logger.error("%s 渲染 %s 布局失败：%s", _LOG, layout.value, again)
+                raise RenderException(str(again)) from again
 
         if not url:
             raise RenderException("渲染服务没有返回图片地址")
         return str(url)
+
+    @staticmethod
+    async def _shoot(template: str, payload: Mapping[str, Any], options: dict[str, Any]) -> Any:
+        return await html_renderer.render_custom_template(
+            template, dict(payload), return_url=True, options=options
+        )
 
     # -- 纯文本兜底 -------------------------------------------------------- #
 

@@ -2,7 +2,7 @@ name: astrbot_plugin_vn_atelier
 display_name: 视觉小说工房
 desc: 视觉小说（Galgame）资料助手。检索作品 / 角色 / 会社，查评分排行与发售纪念日，标签推荐、随机抽游戏、以图识角色出处、收藏清单与每日简讯推送，结果统一渲染成四套主题的图片卡片。
 short_desc: Galgame 资料助手：作品角色检索、排行、识图出处、每日简讯，输出图片卡片
-version: v3.0.0
+version: v3.1.0
 author: Whereis-Alice
 repo: https://github.com/Whereis-Alice/astrbot_plugin_vn_atelier
 astrbot_version: ">=4.16,<5"

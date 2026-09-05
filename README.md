@@ -12,7 +12,7 @@
 </p>
 
 <p>
-<img alt="version" src="https://img.shields.io/badge/version-v3.0.0-6c7ee1">
+<img alt="version" src="https://img.shields.io/badge/version-v3.1.0-6c7ee1">
 <img alt="AstrBot" src="https://img.shields.io/badge/AstrBot-%E2%89%A5%204.16-4c8dff">
 <img alt="Python" src="https://img.shields.io/badge/Python-3.10%2B-3776ab">
 <img alt="License" src="https://img.shields.io/badge/License-AGPL--3.0-9b6fd6">
@@ -65,7 +65,9 @@
 - **渲染失败会退回纯文本**，而不是丢一句报错了事。截图服务临时不可用时，同样的内容会用文字发出来。
 - **图片两级缓存**：磁盘 + 内存，带容量上限、有效期和 LRU 淘汰，同一张封面不会反复下载。
 - **指令冷却**：同一用户在冷却期内的重复指令会被静默忽略，避免刷屏和对外部 API 的滥用。
-- **网络层统一重试与超时**，命中 Cloudflare 人机校验时会自动换成浏览器 TLS 指纹再试一次。
+- **网络层统一重试与超时**：被站点按客户端指纹拦下时，自动换成浏览器 TLS 指纹重试；真撞上需要跑 JavaScript 的浏览器验证，则识别出来并把该站点熔断一段时间 —— 不做无意义的重试，也不把日志刷满。
+- **数据源不通时会绕路**：TouchGal 被验证页拦住时，`工房 随机` 自动改用 VNDB 出结果，指令照常可用。
+- **渲染参数会自适应**：高清参数被老版本截图服务拒绝时，自动降级成保守参数重渲一次，而不是直接失败。
 - **配置容错**：填错的数字会被收敛到合法区间并写进日志，插件不会因为一个配置项而加载失败。
 - **干净的卸载**：停用或重载时会关闭连接池、注销定时任务与函数工具，不留悬挂的后台协程。
 
@@ -183,7 +185,9 @@ git clone https://github.com/Whereis-Alice/astrbot_plugin_vn_atelier.git
 | 字体来源 | 在线字体 | 在线字体观感最好但要能访问 CDN；也可以改用系统字体或交给浏览器默认值 |
 | 在线字体 CSS 地址 | 霞鹜文楷 jsDelivr | CDN 不通时可换国内镜像 |
 | 字体名称 | LXGW WenKai | 用系统字体时改成本机确实装了的中文字体 |
-| 图片质量 | 92 | JPEG 压缩质量，调低可以让发图更快 |
+| 清晰度 | 高清（1.3x） | 给渲染页面装一块高分屏。觉得字发虚就调到超清，详见常见问题里的对照表 |
+| 图片格式 | JPEG | PNG 无损但体积大一倍以上，一般不需要换 |
+| 图片质量 | 95 | JPEG 压缩质量，调低可以让发图更快；选 PNG 时该项不生效 |
 | 显示页脚 | 开 | 图片底部的数据来源与生成时间 |
 
 **网络与内容分级**
@@ -192,9 +196,11 @@ git clone https://github.com/Whereis-Alice/astrbot_plugin_vn_atelier.git
 | --- | --- | --- |
 | 允许 R18 内容 | 关 | 关闭时过滤成人向作品与图片 |
 | 代理地址 | 空 | 只作用于本插件，例如 http://127.0.0.1:7897，支持 http / https / socks5 |
+| TouchGal 站点地址 | https://www.touchgal.ink/ | 站点换域名时改这里，不用等插件更新 |
 | TouchGal 登录 Token | 空 | 留空只能看到公开资源，取法见下面的常见问题 |
-| Cloudflare cf_clearance | 空 | 只在 TouchGal 返回 403 或人机验证页时才需要 |
-| TLS 浏览器指纹 | chrome136 | curl_cffi 伪装用的浏览器标识 |
+| Cloudflare cf_clearance | 空 | 站点开启浏览器验证时才需要；它与出口 IP、浏览器 UA 绑定，跨机器复制无效 |
+| 浏览器验证求解服务 | 空 | FlareSolverr 地址，填了就能自动过浏览器验证，须与 AstrBot 同一出口 IP |
+| TLS 浏览器指纹 | chrome136 | curl_cffi 伪装用的浏览器标识，绕不过需要执行 JavaScript 的验证页 |
 
 **每日推送**
 
@@ -253,11 +259,73 @@ git clone https://github.com/Whereis-Alice/astrbot_plugin_vn_atelier.git
 <details>
 <summary><b>「工房 下载」查不到资源，或者日志里全是 403</b></summary>
 
-TouchGal 有 Cloudflare 防护。插件的做法是：普通请求失败后自动换成 `curl_cffi` 模拟真实浏览器的 TLS 指纹再试一次，
-所以先确认 `curl_cffi` 装上了（`pip install curl_cffi`）。
+TouchGal 有 Cloudflare 防护，403 分两种，处理方式完全不同。先到日志里搜 `[视觉小说工房]` 对号入座：
 
-想看到需要登录才可见的资源（含 R18），要填 Token：浏览器登录 https://www.touchgal.top/ ，从 Cookie 里复制 `kun-galgame-patch-moe-token` 的值，
-粘到「TouchGal 登录 Token」。如果仍然 403，再把同一处 Cookie 里的 `cf_clearance` 复制到对应配置项。
+**一、只是被客户端指纹拦下** —— 日志出现「转用浏览器指纹重试」，之后请求正常。
+
+站点会拒绝「看起来不像浏览器」的请求。插件收到 403 后会自动换用 `curl_cffi` 模拟真实浏览器的 TLS 指纹重试一次，
+所以只要确认 `curl_cffi` 装上了（`pip install curl_cffi`），这一类基本自动解决；还不行可以在「TLS 浏览器指纹」里换个型号。
+
+**二、站点开启了浏览器验证** —— 日志出现「开启了浏览器验证」。指纹伪装对它无效，见下一条。
+
+另外，要看需要登录才可见的资源（含 R18）得填 Token：浏览器登录 https://www.touchgal.ink/ ，
+从 Cookie 里复制 `kun-galgame-patch-moe-token` 的值，粘到「TouchGal 登录 Token」。
+站点日后换域名也不用等插件更新，把新地址填进「TouchGal 站点地址」即可。
+
+</details>
+
+<details>
+<summary><b>站点开启浏览器验证怎么办</b></summary>
+
+先确认是不是这种情况，满足任一条即是：日志里出现「开启了浏览器验证」；响应头带 `cf-mitigated: challenge`；
+响应正文是标题为 `Just a moment...` 的等待页。
+
+这是 Cloudflare 的 Managed Challenge：它要求客户端**真的执行一段 JavaScript** 并交回答案，通过后才发一张名为 `cf_clearance` 的通行证。
+换指纹、加请求头、反复重试都没有用 —— 缺的不是「像不像浏览器」，而是「有没有跑 JS」。三种解法，按省事程度排列：
+
+1. **配代理**（配置项「代理地址」）—— 换一个没被拦的出口 IP。最省事，通常也最有效。
+2. **手填通行证**（配置项「Cloudflare cf_clearance」）—— 在浏览器里过一次验证，然后从 Cookie 里复制 `cf_clearance`。
+   它**与出口 IP 和浏览器 UA 绑定**：必须在与 AstrBot 同一出口的机器上取，用自己电脑上的值去喂云服务器是无效的。有效期通常几十分钟到几小时，过期要重取。
+3. **部署 FlareSolverr**（配置项「浏览器验证求解服务」）—— 一个用真实无头浏览器代跑验证的小服务。
+   填上地址后，插件遇到验证会自动向它换取通行证、重放请求，并把通行证复用 15 分钟，是唯一能长期自动续证的方案。
+   它同样要求与 AstrBot 出口 IP 相同，所以一般直接跑在同一台机器上：
+
+   ```bash
+   docker run -d --name flaresolverr -p 8191:8191 --restart unless-stopped ghcr.io/flaresolverr/flaresolverr:latest
+   ```
+
+   然后把 `http://127.0.0.1:8191` 填进「浏览器验证求解服务」。
+
+没解决也不会把日志刷爆：命中验证后插件会把该站点**熔断 300 秒**，期间的请求直接跳过，整轮只留一条警告。
+`工房 随机` 还会自动改用 VNDB 出结果，所以验证期间这条指令照常可用；`工房 下载` 只有 TouchGal 一个来源，得按上面的办法处理。
+
+</details>
+
+<details>
+<summary><b>图片不够清晰，怎么调</b></summary>
+
+「清晰度」调的是渲染时的设备像素比，相当于给渲染页面换一块高分屏：版式一模一样，但字和封面的实际像素更多。
+卡片的排版宽度固定是 1000 CSS 像素，所以输出宽度就是 1000 乘以倍率；高度随内容长短变化。
+
+下面是同一张「今日推荐」卡片（封面 + 3 张游戏截图 + 4 张角色立绘）的实测值：
+
+| 清晰度 | 输出宽度 | 单张体积 |
+| --- | --- | --- |
+| 标准（1x） | 1000 px | 约 280 KB |
+| 高清（1.3x，默认） | 1300 px | 约 430 KB |
+| 超清（1.8x） | 1800 px | 约 700 KB |
+| 超清 + PNG | 1800 px | 约 2.8 MB |
+
+这已经是最长的一种版式，指令表、排行榜之类的短卡片会明显更小。
+
+日常用默认的高清就够 —— 聊天平台大多会对图片再压一次，清晰度的收益主要体现在放大看小字的时候。
+觉得字发虚、或者想截图存档，调到超清。
+
+「图片格式」建议保持 JPEG。PNG 是无损的，但从上表能看出体积会翻到四倍，部分平台会二次压缩甚至直接拒收大图，
+除非确实要留无损存档，否则不划算。「图片质量」默认 95，是画质与体积的平衡点，降到 80 以下文字边缘会开始出现噪点。
+
+如果宿主的截图服务版本较老、不认这些参数，插件会自动用一套保守参数重渲一次，并在日志里留一条警告 ——
+结果只是清晰度回到标准水平，不会因此发不出图。
 
 </details>
 
@@ -305,7 +373,8 @@ python tests/test_smoke.py     # 也可以用 pytest tests
 ```
 
 它会导入全部模块、校验模板锚点与主题／版式清单、把各种畸形配置喂给设置解析器，
-再用 Jinja 把四种版式 × 四套主题各渲染一遍，并确认用户数据里的 `<script>` 无法越出页面。
+再用 Jinja 把四种版式 × 四套主题各渲染一遍，确认清晰度与风控相关的参数都会收敛到合法值，
+并确认用户数据里的 `<script>` 无法越出页面。
 提 PR 前请顺手跑一下 `ruff check .` 与 `ruff format .`。
 
 ---
@@ -315,7 +384,7 @@ python tests/test_smoke.py     # 也可以用 pytest tests
 | 来源 | 用途 |
 | --- | --- |
 | [VNDB](https://vndb.org/) | 作品、角色、会社的元数据，评分、发售日期与标签 |
-| [TouchGal](https://www.touchgal.top/) | 中文简介、游戏截图、资源链接 |
+| [TouchGal](https://www.touchgal.ink/) | 中文简介、游戏截图、资源链接 |
 | [AnimeTrace](https://www.animetrace.com/) | 以图识别角色与出处 |
 
 这些都是第三方公益或商业服务，请遵守各自的使用条款，不要拿本插件做高频抓取。

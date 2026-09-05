@@ -101,7 +101,7 @@ LAYOUT_OF_COMMAND: Final[dict[CommandType, Layout]] = {
 
 VNDB_FIELDS: Final[dict[str, str]] = {
     "vn": (
-        "id,average,rating,released,length_minutes,platforms,aliases,"
+        "id,average,rating,released,length_minutes,platforms,aliases,description,"
         "developers{id,original,name},titles{lang,title,official},"
         "image{url},alttitle,title"
     ),

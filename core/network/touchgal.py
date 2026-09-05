@@ -1,7 +1,12 @@
 """TouchGal 站点客户端。
 
 站点前置了 Cloudflare，普通 aiohttp 请求经常拿到校验页，因此所有请求都
-打开 handle_cf，让 Http 在必要时用浏览器 TLS 指纹重试一次。
+打开 handle_cf，让 Http 在必要时用浏览器 TLS 指纹重试一次；遇到需要执行
+JavaScript 的「Just a moment...」挑战页时由 Http 统一抛 ChallengeException，
+调用方（如随机指令）可以据此切换到 VNDB 数据源。
+
+站点根地址走配置而非硬编码常量：官方历史上从 touchgal.top 换到过
+touchgal.ink，域名再变时用户改一个配置项就能继续用，不必等插件更新。
 """
 
 from __future__ import annotations
@@ -19,8 +24,6 @@ from ..types import (
 )
 from ..utils import clip
 from .http import Http
-
-_BASE = "https://www.touchgal.ink/"
 
 _BROWSER_UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -43,11 +46,24 @@ class TouchGal:
     # -- 请求要素 ---------------------------------------------------------- #
 
     @property
+    def base(self) -> str:
+        """站点根地址，始终以 / 结尾。"""
+        return self._settings.safety.touchgal_base
+
+    @property
+    def cooldown(self) -> int:
+        """站点因浏览器验证被熔断的剩余秒数，0 表示可以正常请求。
+
+        指令层可以先问一句再决定要不要发请求，省掉一次注定 403 的往返。
+        """
+        return self._http.challenged(self.base)
+
+    @property
     def _headers(self) -> dict[str, str]:
         return {
             "Content-Type": "application/json",
             "user-agent": _BROWSER_UA,
-            "referer": _BASE,
+            "referer": self.base,
             "x-requested-with": "kun-fetch",
         }
 
@@ -104,7 +120,7 @@ class TouchGal:
             "selectedYears": ["all"],
             "selectedMonths": ["all"],
         }
-        url = f"{_BASE}api/search/"
+        url = f"{self.base}api/search/"
         response = await self._http.post(
             url,
             payload,
@@ -124,7 +140,7 @@ class TouchGal:
 
     async def request_random(self) -> str:
         """取一个随机作品的站内唯一标识。"""
-        url = f"{_BASE}api/home/random"
+        url = f"{self.base}api/home/random"
         response = await self._http.get(
             url,
             res_type="json",
@@ -139,7 +155,7 @@ class TouchGal:
 
     async def request_html(self, unique_id: str) -> str:
         """取详情页 HTML，交给 utils.html_parser 解析。"""
-        url = f"{_BASE}{unique_id}"
+        url = f"{self.base}{unique_id}"
         html = await self._http.get(
             url,
             res_type="text",
@@ -157,7 +173,7 @@ class TouchGal:
         条目数上限在这里统一收口。上游把配置项声明成布尔值却拿去做切片，
         结果 True 只剩 1 条、False 直接剩 0 条，等于功能失效。
         """
-        url = f"{_BASE}api/patch/resource?patchId={patch_id}"
+        url = f"{self.base}api/patch/resource?patchId={patch_id}"
         response = await self._http.get(
             url,
             res_type="json",

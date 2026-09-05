@@ -22,6 +22,16 @@ from .types import CHARACTER_OPTION_KEYS, Theme
 DEFAULT_FONT_URL = "https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css"
 DEFAULT_FONT_FAMILY = "LXGW WenKai"
 
+#: 渲染视口宽度（CSS 像素）。必须与 base.html 里 <meta name="viewport"> 的
+#: width 保持一致：t2i 服务在未显式收到 viewport_width 时会去正则匹配这个
+#: meta，两处不一致会让排版与实际截图宽度错位。
+VIEWPORT_WIDTH = 1000
+
+#: 设备像素比档位 → 实际倍率，仅用于日志与文档展示。
+SCALE_FACTORS = {"normal": 1.0, "high": 1.3, "ultra": 1.8}
+
+DEFAULT_TOUCHGAL_BASE = "https://www.touchgal.ink/"
+
 
 # --------------------------------------------------------------------------- #
 # 原始值解析helpers
@@ -120,13 +130,48 @@ class RenderSettings:
     font_source: str = "cdn"
     font_url: str = DEFAULT_FONT_URL
     font_family: str = DEFAULT_FONT_FAMILY
-    quality: int = 92
+    quality: int = 95
     show_footer: bool = True
+
+    scale: str = "high"
+    """设备像素比档位：normal(1x) / high(1.3x) / ultra(1.8x)。"""
+
+    image_format: str = "jpeg"
+    """输出格式：jpeg 体积小，png 无损但更大。"""
+
+    @property
+    def scale_factor(self) -> float:
+        return SCALE_FACTORS.get(self.scale, 1.3)
 
     @property
     def render_options(self) -> dict[str, Any]:
-        """传给 html_renderer 的截图参数。"""
-        return {"type": "jpeg", "quality": self.quality}
+        """传给 html_renderer 的截图参数。
+
+        清晰度的关键是 scale + device_scale_factor_level 必须成对出现：
+        只给档位而不把 scale 切成 "device"，截图会被重新缩回 CSS 像素，
+        文件更大但一点没变清楚。viewport_width 显式给出，避免对端解析
+        HTML meta 失败时退回一个更窄的默认宽度。
+        """
+        options: dict[str, Any] = {
+            "full_page": True,
+            "type": self.image_format,
+            "scale": "device",
+            "device_scale_factor_level": self.scale,
+            "viewport_width": VIEWPORT_WIDTH,
+        }
+        if self.image_format != "png":
+            options["quality"] = self.quality
+        return options
+
+    @property
+    def safe_options(self) -> dict[str, Any]:
+        """最小可用参数集。
+
+        清晰度参数是较新的 t2i 服务才认的；老版本服务或官方公共端点遇到
+        未知键可能直接 400。渲染层首次失败后会拿这一份重试，保证「画质
+        提升」不会变成「彻底渲染不出来」。
+        """
+        return {"full_page": True, "type": "jpeg", "quality": min(self.quality, 92)}
 
 
 @dataclass(slots=True)
@@ -138,6 +183,12 @@ class SafetySettings:
     touchgal_token: str = ""
     cf_clearance: str = ""
     tls: str = "chrome136"
+
+    solver_url: str = ""
+    """FlareSolverr 地址，用于自动通过 Cloudflare 浏览器验证。留空则关闭。"""
+
+    touchgal_base: str = DEFAULT_TOUCHGAL_BASE
+    """TouchGal 站点根地址。官方换域名时无需等插件更新，改这里即可。"""
 
 
 @dataclass(slots=True)
@@ -274,8 +325,10 @@ class Settings:
             font_source=font_source,
             font_url=font_url,
             font_family=_as_str(render_raw.get("fontFamily"), DEFAULT_FONT_FAMILY),
-            quality=_as_int(render_raw.get("renderQuality"), 92, 40, 100),
+            quality=_as_int(render_raw.get("renderQuality"), 95, 40, 100),
             show_footer=_as_bool(render_raw.get("showFooter"), True),
+            scale=_option_key(render_raw.get("renderScale"), ["normal", "high", "ultra"], "high"),
+            image_format=_option_key(render_raw.get("renderFormat"), ["jpeg", "png"], "jpeg"),
         )
 
         safety_raw = _section(config, "safetySetting")
@@ -285,12 +338,24 @@ class Settings:
         ):
             problems.append("安全设置-代理地址缺少协议前缀（如 http://），已忽略该代理")
             proxy = ""
+        solver_url = _as_str(safety_raw.get("solverUrl"))
+        if solver_url and not solver_url.lower().startswith(("http://", "https://")):
+            problems.append("安全设置-验证求解器地址不是合法的 http(s) 链接，已忽略")
+            solver_url = ""
+        touchgal_base = _as_str(safety_raw.get("touchgalBase"), DEFAULT_TOUCHGAL_BASE)
+        if not touchgal_base.lower().startswith(("http://", "https://")):
+            problems.append(
+                f"安全设置-TouchGal 站点地址【{touchgal_base}】缺少协议前缀，已改用默认域名"
+            )
+            touchgal_base = DEFAULT_TOUCHGAL_BASE
         safety = SafetySettings(
             enable_nsfw=_as_bool(safety_raw.get("enableNSFW"), False),
             proxy=proxy,
             touchgal_token=_as_str(safety_raw.get("touchgalToken")),
             cf_clearance=_as_str(safety_raw.get("cfClearance")),
             tls=_as_str(safety_raw.get("tls"), "chrome136"),
+            solver_url=solver_url.rstrip("/"),
+            touchgal_base=touchgal_base if touchgal_base.endswith("/") else touchgal_base + "/",
         )
 
         character_raw = _section(config, "characterSetting")

@@ -11,7 +11,7 @@ from .splicer import (
     search_lines,
     vn_lines,
 )
-from .text import brief, clip, join_cn, paragraphs
+from .text import brief, clip, join_cn, paragraphs, plain_markup
 
 __all__ = [
     "FileIO",
@@ -26,6 +26,7 @@ __all__ = [
     "paragraphs",
     "parse_touchgal_details",
     "parse_touchgal_details_async",
+    "plain_markup",
     "producer_lines",
     "search_lines",
     "to_jpeg",

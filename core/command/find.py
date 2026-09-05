@@ -167,7 +167,7 @@ class FindCommand(BaseCommand):
 
         response, model = await self.runtime.animetrace.request_find(image)
         if not response.data:
-            raise NoResultException(self.command.value, "图片")
+            raise NoResultException(self.command, "图片")
 
         raw = await self._raw_bytes(image)
         hero = {

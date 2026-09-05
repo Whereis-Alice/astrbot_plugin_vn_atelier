@@ -66,6 +66,8 @@ class VndbVnResponse(BaseModel):
     aliases: list[str] | None = None
     developers: list[Developer] | None = None
     titles: list[Title] | None = None
+    # VNDB 官方简介，带自家的标记语法，展示前需过一遍 utils.plain_markup。
+    description: str | None = None
 
     @property
     def display_title(self) -> str:

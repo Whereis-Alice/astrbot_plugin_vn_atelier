@@ -48,6 +48,7 @@ core_types = importlib.import_module(PKG + ".core.types")
 core_settings = importlib.import_module(PKG + ".core.settings")
 core_renderer = importlib.import_module(PKG + ".core.service.renderer")
 core_base = importlib.import_module(PKG + ".core.command.base")
+core_text = importlib.import_module(PKG + ".core.utils.text")
 
 Layout = core_types.Layout
 Theme = core_types.Theme
@@ -325,6 +326,105 @@ def test_user_data_cannot_break_out_of_the_page() -> None:
     assert "<script>alert(1)</script>" not in output
     assert "</style><script>" not in output
     assert "&lt;script&gt;" in output
+
+
+# --------------------------------------------------------------------------- #
+# 6. 清晰度与风控相关设置
+# --------------------------------------------------------------------------- #
+
+
+def test_render_options_carry_device_scale() -> None:
+    """scale 与档位必须成对出现，只给档位的话截图只会变大、不会变清。"""
+    options = RenderSettings().render_options
+    assert options["scale"] == "device"
+    assert options["device_scale_factor_level"] == "high"
+    assert options["viewport_width"] == core_settings.VIEWPORT_WIDTH
+    assert options["type"] == "jpeg"
+    assert options["quality"] == RenderSettings().quality
+    png = dataclasses.replace(RenderSettings(), image_format="png").render_options
+    assert "quality" not in png, "PNG 不接受 quality 参数"
+
+
+def test_safe_options_are_a_real_fallback() -> None:
+    """降级参数必须与高清参数不同，否则失败后重试一次毫无意义。"""
+    render = RenderSettings()
+    assert render.safe_options != render.render_options
+    assert set(render.safe_options) <= {"full_page", "type", "quality"}, "降级参数不能再带新键"
+    assert render.safe_options["quality"] <= 92
+
+
+def test_scale_options_parse_from_schema_labels() -> None:
+    """配置界面存回来的是「键-中文说明」，解析必须认得这种形式。"""
+    picked = Settings.from_config(
+        {"renderSetting": {"renderScale": "ultra-超清（1.8x）", "renderFormat": "png-PNG（无损）"}}
+    )
+    assert picked.render.scale == "ultra"
+    assert picked.render.scale_factor == 1.8
+    assert picked.render.image_format == "png"
+
+    fallback = Settings.from_config(
+        {"renderSetting": {"renderScale": "巨清", "renderFormat": "webp"}}
+    )
+    assert (fallback.render.scale, fallback.render.image_format) == ("high", "jpeg")
+    assert fallback.render.scale_factor == 1.3
+
+
+def test_challenge_settings_are_normalised() -> None:
+    """求解器地址与站点地址都会被拼进 URL，格式必须先收敛。"""
+    good = Settings.from_config(
+        {
+            "safetySetting": {
+                "solverUrl": "http://127.0.0.1:8191/",
+                "touchgalBase": "https://gal.example.com",
+            }
+        }
+    )
+    assert good.safety.solver_url == "http://127.0.0.1:8191", "尾斜杠要去掉，否则拼出双斜杠"
+    assert good.safety.touchgal_base == "https://gal.example.com/", "站点根地址要补尾斜杠"
+
+    bad = Settings.from_config(
+        {"safetySetting": {"solverUrl": "127.0.0.1:8191", "touchgalBase": "touchgal.ink"}}
+    )
+    assert bad.safety.solver_url == "", "缺协议前缀的求解器地址应被忽略"
+    assert bad.safety.touchgal_base == core_settings.DEFAULT_TOUCHGAL_BASE
+    assert any("求解器" in item for item in bad.warnings)
+
+
+def test_plain_markup_strips_vndb_bbcode() -> None:
+    """VNDB 简介带 BBCode：方括号不能露到图上，剧透块更不能留。"""
+    text = core_text.plain_markup(
+        "开场[b]很平静[/b]，[spoiler]女主早就死了[/spoiler]，"
+        "详见 [url=https://vndb.org/v11]原作[/url]。"
+    )
+    assert "[" not in text
+    assert "]" not in text
+    assert "女主" not in text, "剧透块必须整段删掉"
+    assert "很平静" in text
+    assert "原作" in text, "链接应压成可读文字而不是被整段丢弃"
+
+
+def test_command_exceptions_accept_enum_and_str() -> None:
+    """异常都在错误路径上构造，本身绝不能再抛异常。"""
+    kinds = (
+        core_types.InvalidArgsException,
+        core_types.SessionTimeoutException,
+        core_types.ArgsOrNullException,
+        core_types.NoResultException,
+    )
+    command = core_types.CommandType.RANDOM
+    for kind in kinds:
+        for given in (command, command.value):
+            error = kind(given, "关键词")
+            assert command.value in str(error), kind.__name__
+            summary = core_text.brief(error)
+            assert summary, kind.__name__
+            assert "关键词" not in summary, "技术细节不该抛给用户"
+
+
+def test_viewport_meta_matches_render_width() -> None:
+    """t2i 端点用正则从 meta 里读宽度，引号和数字都不能改。"""
+    base = (RESOURCES / "template" / "base.html").read_text(encoding="utf-8")
+    assert ('content="width=' + str(core_settings.VIEWPORT_WIDTH)) in base
 
 
 # --------------------------------------------------------------------------- #

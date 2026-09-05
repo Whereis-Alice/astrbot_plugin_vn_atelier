@@ -20,6 +20,7 @@ from .enums import (
 from .exceptions import (
     ArgsOrNullException,
     AuthorityException,
+    ChallengeException,
     CooldownException,
     EarlyReturn,
     InternetException,
@@ -67,6 +68,7 @@ __all__ = [
     "AuthorityException",
     "Base64",
     "CacheGroup",
+    "ChallengeException",
     "CommandType",
     "CooldownException",
     "DetectedInfo",
