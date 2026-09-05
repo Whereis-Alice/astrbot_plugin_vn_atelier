@@ -183,7 +183,13 @@
       },
       "cfClearance": {
         "description": "Cloudflare cf_clearance",
-        "hint": "可选。TouchGal 开启浏览器验证（日志出现「浏览器验证」或 403）时可填这一项，从浏览器 Cookie 里复制 cf_clearance 的值。注意：它与「取得它的出口 IP + 当时的浏览器 UA」绑定，从自己电脑复制到远程服务器通常无效，必须在与 AstrBot 同一出口的网络环境下获取。",
+        "hint": "可选，应急用。站点开启浏览器验证（日志出现「浏览器验证」或 403）时，可以从浏览器 Cookie 里复制 cf_clearance 的值填进来，只填值本身，不要带「cf_clearance=」和后面的分号（带了会自动截掉并在日志里提醒）。务必知道它的限制：这串 cookie 与签发它的出口 IP、User-Agent 一起签名，从自己电脑复制到机房服务器上一定无效，且有效期通常只有几十分钟。只有 AstrBot 与浏览器走同一个出口时才值得填，并且必须同时填下面的「浏览器 User-Agent」。想长期自动生效请用 FlareSolverr。",
+        "type": "string",
+        "default": ""
+      },
+      "browserUa": {
+        "description": "浏览器 User-Agent",
+        "hint": "只在填了 cf_clearance 时需要，必须来自同一个浏览器，否则那串 cookie 一定通不过验证。取法：在该浏览器地址栏访问 https://www.whatismybrowser.com/detect/what-is-my-user-agent/ ，或在开发者工具 Network 面板里复制任意请求的 user-agent 请求头。留空时插件按下面的 TLS 指纹档位自动推一个同版本的 UA。",
         "type": "string",
         "default": ""
       },

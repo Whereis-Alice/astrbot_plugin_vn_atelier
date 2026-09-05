@@ -85,6 +85,37 @@ def _option_key(raw: Any, allowed: Sequence[str], default: str) -> str:
     return key if key in allowed else default
 
 
+def _clean_clearance(raw: str) -> tuple[str, str | None]:
+    """清洗手填的 cf_clearance，返回（裸值，需要提醒用户的问题）。
+
+    实践中这一项被填错的方式高度集中在两种：一是从开发者工具里连名字一起
+    复制，粘进来的是 ``cf_clearance=xxx``；二是复制了整个 Cookie 请求头，粘
+    进来的是 ``cf_clearance=xxx; other=yyy``。两种都能机械地还原成裸值，所以
+    这里直接改对并如实告知，而不是让用户对着一条 403 日志反复猜。
+    """
+    value = raw.strip().strip('"').strip("'")
+    if not value:
+        return "", None
+    note: str | None = None
+    if ";" in value:
+        picked = ""
+        for chunk in value.split(";"):
+            item = chunk.strip()
+            if item.lower().startswith("cf_clearance="):
+                picked = item
+                break
+        if picked:
+            value = picked
+            note = "安全设置-cf_clearance 里粘进了整段 Cookie，已自动截出 cf_clearance 本身"
+        else:
+            value = value.split(";", 1)[0].strip()
+            note = "安全设置-cf_clearance 含分号，已只保留第一段"
+    if value.lower().startswith("cf_clearance="):
+        value = value.split("=", 1)[1].strip()
+        note = note or "安全设置-cf_clearance 前面带了字段名，已自动去掉"
+    return value, note
+
+
 def _section(config: Mapping[str, Any] | None, name: str) -> Mapping[str, Any]:
     """取出一个配置分组；缺失或类型不对时返回空映射。"""
     if not isinstance(config, Mapping):
@@ -183,6 +214,14 @@ class SafetySettings:
     touchgal_token: str = ""
     cf_clearance: str = ""
     tls: str = "chrome136"
+
+    browser_ua: str = ""
+    """签发 cf_clearance 的那个浏览器的 User-Agent。
+
+    cf_clearance 与「签发它的出口 IP + 当时的 User-Agent」一起被签进签名里，
+    UA 换掉就等于换了个客户端，Cloudflare 会当作没有通行证。所以填 cookie 的
+    人必须把配套的 UA 一起填过来，否则那串 cookie 注定用不上。
+    """
 
     solver_url: str = ""
     """FlareSolverr 地址，用于自动通过 Cloudflare 浏览器验证。留空则关闭。"""
@@ -348,12 +387,26 @@ class Settings:
                 f"安全设置-TouchGal 站点地址【{touchgal_base}】缺少协议前缀，已改用默认域名"
             )
             touchgal_base = DEFAULT_TOUCHGAL_BASE
+        cf_clearance, cf_note = _clean_clearance(_as_str(safety_raw.get("cfClearance")))
+        if cf_note:
+            problems.append(cf_note)
+        if cf_clearance and (len(cf_clearance) < 40 or " " in cf_clearance):
+            problems.append(
+                "安全设置-cf_clearance 看起来不完整（正常是一长串不含空格的字符），请重新复制"
+            )
+        browser_ua = _as_str(safety_raw.get("browserUa"))
+        if cf_clearance and not browser_ua:
+            problems.append(
+                "安全设置-填了 cf_clearance 但没填「浏览器 User-Agent」；"
+                "这串 cookie 与签发它的 UA 绑定，UA 对不上一定通不过验证"
+            )
         safety = SafetySettings(
             enable_nsfw=_as_bool(safety_raw.get("enableNSFW"), False),
             proxy=proxy,
             touchgal_token=_as_str(safety_raw.get("touchgalToken")),
-            cf_clearance=_as_str(safety_raw.get("cfClearance")),
+            cf_clearance=cf_clearance,
             tls=_as_str(safety_raw.get("tls"), "chrome136"),
+            browser_ua=browser_ua,
             solver_url=solver_url.rstrip("/"),
             touchgal_base=touchgal_base if touchgal_base.endswith("/") else touchgal_base + "/",
         )

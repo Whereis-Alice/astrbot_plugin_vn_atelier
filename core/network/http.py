@@ -9,8 +9,15 @@
   日志里刷满同一条警告。
 
 所以命中验证时会立刻停手，把该站点熔断一小段时间，并且只写一条带解决办法
-的警告。如果用户配置了 FlareSolverr，则先请它用真实浏览器过一次挑战，取回
-cf_clearance 后再重放原请求——这是唯一真正能绕过 JS 挑战的路子。
+的警告。在熔断之前还会依次试两条出路：先用用户手填的 cf_clearance 重放一次，
+再请 FlareSolverr 用真实浏览器现场过一次挑战——后者是唯一真正稳定的路子。
+
+关于「为什么手填的 cf_clearance 经常没用」：这张 cookie 的签名里含签发时的
+出口 IP 与 User-Agent。在自己电脑的浏览器里取、再粘到机房服务器上用，两个
+出口 IP 不同，Cloudflare 一律不认。而验证本身多半就是按出口 IP 的信誉触发的
+——家用宽带直接放行、机房 IP 一律拦，于是「本地能开网页、服务器上 403」成了
+最常见的现象。所以手填只在「AstrBot 与浏览器同出口」时才有意义，这一层会把
+这个结论直接写进日志，而不是让用户对着 403 反复试。
 """
 
 from __future__ import annotations
@@ -65,12 +72,19 @@ _SOLVER_TIMEOUT_MS: Final = 60000
 """留给 FlareSolverr 跑完挑战的时间。真实浏览器启动 + 等待 JS 需要几十秒。"""
 
 _ADVICE = (
-    "三种解法（详见 README「站点开启浏览器验证怎么办」）："
-    "① 配置代理，换一个没被拦的出口 IP；"
-    "② 填写 cf_clearance，注意它与出口 IP、User-Agent 绑定，"
-    "必须在与本机同一出口的浏览器里取；"
-    "③ 部署 FlareSolverr 并填写「浏览器验证求解服务」，由它自动过验证。"
+    "验证通常是按出口 IP 的信誉触发的：家用宽带直接放行，机房 IP 几乎必然中招，"
+    "所以「我电脑上能打开」并不代表服务器上也能。三种解法"
+    "（详见 README「站点开启浏览器验证怎么办」）："
+    "① 配置代理，把请求换到一个没被拦的出口；"
+    "② 部署 FlareSolverr 并填写「浏览器验证求解服务」，让它在本机用真实浏览器现场求解，"
+    "这是唯一能长期自动生效的办法；"
+    "③ 手填 cf_clearance 并配套填写「浏览器 User-Agent」，"
+    "但它与签发时的出口 IP 绑定，只有 AstrBot 与浏览器同出口时才有效。"
 )
+
+_CLEARANCE_EPOCH_LOW: Final = 1_500_000_000
+_CLEARANCE_EPOCH_HIGH: Final = 4_000_000_000
+"""判定「某一段是不是签发时间戳」的合理区间，约 2017 年到 2096 年。"""
 
 _MISS: Final = object()
 """内部哨兵：表示「没有拿到结果」，与合法的 None/空字符串区分开。"""
@@ -89,6 +103,62 @@ def mitigation_of(headers: Mapping[str, str] | Any) -> str:
     except AttributeError:
         return ""
     return str(value).strip() if value else ""
+
+
+def clearance_issued_at(token: str) -> float:
+    """从 cf_clearance 里读出签发时间（unix 秒），读不出来时返回 0。
+
+    Cloudflare 把签发时刻以明文放在用短横线分隔的其中一段里，形如
+    ``<随机串>-<1757074232>-<版本>-<签名>``。这不是公开契约，但只用来生成
+    「这张通行证是几点签的」这句提示，判断错也只是提示不准，不影响请求。
+    """
+    for segment in token.split("-"):
+        if not segment.isdigit():
+            continue
+        moment = int(segment)
+        if _CLEARANCE_EPOCH_LOW <= moment <= _CLEARANCE_EPOCH_HIGH:
+            return float(moment)
+    return 0.0
+
+
+def describe_age(issued_at: float, now: float | None = None) -> str:
+    """把签发时间说成人话，例如「4 小时 48 分钟前签发」。"""
+    if issued_at <= 0:
+        return "签发时间未知"
+    seconds = int((time.time() if now is None else now) - issued_at)
+    if seconds < 0:
+        return "签发时间在未来，本机时钟可能不准"
+    if seconds < 60:
+        return f"{seconds} 秒前签发"
+    minutes, seconds = divmod(seconds, 60)
+    if minutes < 60:
+        return f"{minutes} 分钟前签发"
+    hours, minutes = divmod(minutes, 60)
+    if hours < 24:
+        return f"{hours} 小时 {minutes} 分钟前签发"
+    days, hours = divmod(hours, 24)
+    return f"{days} 天 {hours} 小时前签发"
+
+
+def ua_for_profile(profile: str, fallback: str) -> str:
+    """按 TLS 指纹档位给出配套的 User-Agent。
+
+    curl_cffi 伪装的是 TLS/HTTP2 握手指纹，UA 仍然要自己声明。两者对不上
+    （指纹说 Chrome 136、UA 说 Chrome 147）本身就是一条风控特征，所以这里从
+    ``chrome136`` 这类档位名里取出主版本号拼一个匹配的 UA。认不出来的档位
+    （safari、firefox 等）保持调用方给的默认值。
+    """
+    name = profile.strip().lower()
+    if not name.startswith(("chrome", "edge")):
+        return fallback
+    major = "".join(ch for ch in name if ch.isdigit())[:3]
+    if len(major) < 2:
+        return fallback
+    base = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        f"(KHTML, like Gecko) Chrome/{major}.0.0.0 Safari/537.36"
+    )
+    return f"{base} Edg/{major}.0.0.0" if name.startswith("edge") else base
 
 
 def host_of(url: str) -> str:
@@ -177,6 +247,12 @@ class Http:
         self._lock = asyncio.Lock()
         self._guard = ChallengeGuard()
         self._passes: dict[str, Clearance] = {}
+        self._manual_dead: dict[str, str] = {}
+        """记下「哪个站点上、哪一串手填 cf_clearance 已经证明无效」。
+
+        存的是 cookie 本身而不只是站点名：用户在 WebUI 里换了新值就应该再试
+        一次，没换就不该每次请求都重放一遍注定失败的请求、刷一遍同样的日志。
+        """
 
     # -- 生命周期 ---------------------------------------------------------- #
 
@@ -195,6 +271,7 @@ class Http:
         self._session = None
         self._guard.reset()
         self._passes.clear()
+        self._manual_dead.clear()
 
     async def _ensure_session(self) -> aiohttp.ClientSession:
         if self._session is not None and not self._session.closed:
@@ -367,7 +444,7 @@ class Http:
                 await asyncio.sleep(0.5 * attempt)
 
         if challenge:
-            solved = await self._solve_and_replay(
+            solved = await self._bypass_and_replay(
                 method, url, host, res_type, merged, jar, params, body
             )
             if solved is not _MISS:
@@ -418,8 +495,39 @@ class Http:
             return ""
         return "人机校验页" if looks_like_challenge(raw.decode("utf-8", "ignore")) else ""
 
+    @property
+    def _manual_pass(self) -> Clearance | None:
+        """把用户手填的 cf_clearance 包成一张通行证，没填则返回 None。"""
+        safety = self._settings.safety
+        if not safety.cf_clearance:
+            return None
+        return Clearance(
+            cookies={"cf_clearance": safety.cf_clearance},
+            user_agent=safety.browser_ua,
+            expire=time.monotonic() + _CLEARANCE_TTL,
+        )
+
+    def _manual_verdict(self, host: str) -> str:
+        """手填的通行证没通过时，把最可能的真实原因直接说出来。"""
+        safety = self._settings.safety
+        age = describe_age(clearance_issued_at(safety.cf_clearance))
+        ua_note = (
+            "UA 已配套填写" if safety.browser_ua else "且没有填「浏览器 User-Agent」，UA 必然对不上"
+        )
+        return (
+            f"手填的 cf_clearance 通不过 {host} 的验证（{age}，{ua_note}）。"
+            "这串 cookie 与签发它的出口 IP 绑定，在自己电脑上取、拿到另一台机器上用，"
+            "Cloudflare 一律不认。要让它生效只有两条路：用代理把插件的出口换成与浏览器"
+            "相同的那一个，或者干脆改用 FlareSolverr 在本机现场求解。"
+        )
+
     def _attach_pass(self, host: str, headers: dict[str, str], jar: dict[str, str]) -> None:
-        """把该站点缓存中的通行证附加到本次请求上。"""
+        """把该站点缓存中的通行证附加到本次请求上。
+
+        缓存里可能是 FlareSolverr 求解得来的，也可能是手填的 cf_clearance 被
+        实测证明有效之后存进来的。两者都只对「确实需要它」的站点生效，不会把
+        cookie 撒给 VNDB、渲染服务这些从不做验证的地址。
+        """
         current = self._passes.get(host)
         if current is None:
             return
@@ -429,7 +537,7 @@ class Http:
         headers.update(current.headers)
         jar.update(current.cookies)
 
-    async def _solve_and_replay(
+    async def _bypass_and_replay(
         self,
         method: str,
         url: str,
@@ -440,16 +548,54 @@ class Http:
         params: dict[str, Any] | None,
         body: Any,
     ) -> Any:
-        """请 FlareSolverr 过一次验证，然后带着通行证重放请求。
+        """命中验证后依次试两条出路，都不通才让调用方去熔断。
 
-        未配置求解服务时立刻返回哨兵，不产生任何额外请求。
+        ① 用户手填的 cf_clearance —— 不花任何额外资源，值得试，但它只在
+           「AstrBot 与取 cookie 的浏览器同一个出口 IP」时才可能有效，所以只在
+           这里试一次；成功就缓存起来给该站点后续请求复用，失败就记下这一串已经
+           无效，直到用户换成新值为止不再重复。
+        ② FlareSolverr —— 真实浏览器现场求解，未配置时不产生任何额外请求。
         """
-        # 走到这一步说明手上那张通行证（如果有）已经失效了，先丢掉再求解。
+        # 走到这一步说明手上那张通行证（如果有）已经失效了，先丢掉。
         self._passes.pop(host, None)
+
+        manual = self._manual_pass
+        token = self._settings.safety.cf_clearance
+        if manual is not None and self._manual_dead.get(host) != token:
+            replayed = await self._replay(
+                method, url, res_type, headers, jar, params, body, manual, announce=False
+            )
+            if replayed is not _MISS:
+                self._passes[host] = manual
+                logger.info("%s 手填的 cf_clearance 对 %s 有效，已启用", _LOG, host)
+                return replayed
+            self._manual_dead[host] = token
+            logger.warning("%s %s", _LOG, self._manual_verdict(host))
+
         ticket = await self._solve(host, url)
         if ticket is None:
             return _MISS
+        return await self._replay(method, url, res_type, headers, jar, params, body, ticket)
 
+    async def _replay(
+        self,
+        method: str,
+        url: str,
+        res_type: ResType,
+        headers: dict[str, str],
+        jar: dict[str, str],
+        params: dict[str, Any] | None,
+        body: Any,
+        ticket: Clearance,
+        *,
+        announce: bool = True,
+    ) -> Any:
+        """带着一张通行证重放原请求，没通过时返回哨兵。
+
+        通行证的 User-Agent 必须覆盖原请求里的那个：cf_clearance 是连着 UA 一起
+        签的，两者不一致等于没带。announce=False 用于「先试试看」的场合，让调用方
+        自己写一条更准确的日志，避免同一次失败被解释两遍。
+        """
         try:
             session = await self._ensure_session()
             async with session.request(
@@ -463,19 +609,22 @@ class Http:
                 allow_redirects=True,
             ) as response:
                 if response.status >= 400:
-                    logger.warning(
-                        "%s 带 cf_clearance 重放仍失败：%s 返回 %s", _LOG, url, response.status
-                    )
+                    if announce:
+                        logger.warning(
+                            "%s 带 cf_clearance 重放仍失败：%s 返回 %s", _LOG, url, response.status
+                        )
                     return _MISS
                 if res_type == "bytes":
                     return await response.read()
                 text = await response.text()
                 if looks_like_challenge(text):
-                    logger.warning("%s 带 cf_clearance 重放仍是校验页：%s", _LOG, url)
+                    if announce:
+                        logger.warning("%s 带 cf_clearance 重放仍是校验页：%s", _LOG, url)
                     return _MISS
                 return jsonlib.loads(text) if res_type == "json" else text
         except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as error:
-            logger.warning("%s 带 cf_clearance 重放异常：%s", _LOG, error)
+            if announce:
+                logger.warning("%s 带 cf_clearance 重放异常：%s", _LOG, error)
             return _MISS
 
     async def _solve(self, host: str, url: str) -> Clearance | None:

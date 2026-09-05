@@ -49,6 +49,8 @@ core_settings = importlib.import_module(PKG + ".core.settings")
 core_renderer = importlib.import_module(PKG + ".core.service.renderer")
 core_base = importlib.import_module(PKG + ".core.command.base")
 core_text = importlib.import_module(PKG + ".core.utils.text")
+core_http = importlib.import_module(PKG + ".core.network.http")
+core_touchgal = importlib.import_module(PKG + ".core.network.touchgal")
 
 Layout = core_types.Layout
 Theme = core_types.Theme
@@ -388,6 +390,96 @@ def test_challenge_settings_are_normalised() -> None:
     assert bad.safety.solver_url == "", "缺协议前缀的求解器地址应被忽略"
     assert bad.safety.touchgal_base == core_settings.DEFAULT_TOUCHGAL_BASE
     assert any("求解器" in item for item in bad.warnings)
+
+
+def test_clearance_is_cleaned_and_reported() -> None:
+    """cf_clearance 最常见的两种填错方式必须被自动改对，并且如实告知。"""
+    bare = "a" * 200 + "-1757074232-1.2.1.1-" + "b" * 200
+
+    named = Settings.from_config({"safetySetting": {"cfClearance": "cf_clearance=" + bare}})
+    assert named.safety.cf_clearance == bare, "连字段名一起复制时要自动去掉前缀"
+    assert any("字段名" in item for item in named.warnings)
+
+    whole = Settings.from_config(
+        {"safetySetting": {"cfClearance": "foo=1; cf_clearance=" + bare + "; bar=2"}}
+    )
+    assert whole.safety.cf_clearance == bare, "整段 Cookie 里要截出 cf_clearance 本身"
+    assert any("整段 Cookie" in item for item in whole.warnings)
+
+    short = Settings.from_config({"safetySetting": {"cfClearance": "abc"}})
+    assert any("看起来不完整" in item for item in short.warnings)
+
+    lonely = Settings.from_config({"safetySetting": {"cfClearance": bare}})
+    assert any("User-Agent" in item for item in lonely.warnings), "填了 cookie 没填 UA 要提醒"
+
+    paired = Settings.from_config(
+        {"safetySetting": {"cfClearance": bare, "browserUa": "Mozilla/5.0 (X11)"}}
+    )
+    assert paired.safety.browser_ua == "Mozilla/5.0 (X11)"
+    assert not any("User-Agent" in item for item in paired.warnings)
+
+
+def test_clearance_age_is_readable() -> None:
+    """签发时间要能从 cookie 里读出来，读不出来也不能报错。"""
+    issued = 1757074232
+    token = "Xk9" + "z" * 30 + "-" + str(issued) + "-1.2.1.1-" + "q" * 30
+    assert core_http.clearance_issued_at(token) == float(issued)
+    assert core_http.clearance_issued_at("没有时间戳的东西") == 0.0
+    assert core_http.clearance_issued_at("") == 0.0
+
+    assert core_http.describe_age(0) == "签发时间未知"
+    assert core_http.describe_age(issued, now=issued + 30) == "30 秒前签发"
+    assert core_http.describe_age(issued, now=issued + 1800) == "30 分钟前签发"
+    assert core_http.describe_age(issued, now=issued + 17312) == "4 小时 48 分钟前签发"
+    assert core_http.describe_age(issued, now=issued + 200000) == "2 天 7 小时前签发"
+    assert "时钟" in core_http.describe_age(issued, now=issued - 60)
+
+
+def test_user_agent_matches_tls_profile() -> None:
+    """声明的浏览器版本与伪装的 TLS 指纹对不上，本身就是一条风控特征。"""
+    fallback = "FALLBACK-UA"
+    assert "Chrome/136." in core_http.ua_for_profile("chrome136", fallback)
+    assert "Chrome/131." in core_http.ua_for_profile("chrome131", fallback)
+    assert "Edg/101." in core_http.ua_for_profile("edge101", fallback)
+    assert core_http.ua_for_profile("safari17_0", fallback) == fallback
+    assert core_http.ua_for_profile("", fallback) == fallback
+
+    tuned = Settings.from_config({"safetySetting": {"tls": "chrome120"}})
+    client = core_touchgal.TouchGal(None, tuned)  # type: ignore[arg-type]
+    assert "Chrome/120." in client._user_agent, "没填 UA 时要按指纹档位推一个同版本的"
+
+    manual = Settings.from_config(
+        {"safetySetting": {"tls": "chrome120", "browserUa": "MyBrowser/1.0"}}
+    )
+    assert core_touchgal.TouchGal(None, manual)._user_agent == "MyBrowser/1.0"  # type: ignore[arg-type]
+
+
+def test_clearance_is_not_attached_to_every_request() -> None:
+    """cf_clearance 只该在真正命中验证时挂上，不该跟着每个请求出门。"""
+    token = "c" * 120 + "-1757074232-1.2.1.1"
+    tuned = Settings.from_config(
+        {"safetySetting": {"cfClearance": token, "browserUa": "UA/1", "touchgalToken": "t"}}
+    )
+    cookies = core_touchgal.TouchGal(None, tuned)._cookies  # type: ignore[arg-type]
+    assert "cf_clearance" not in cookies, "站点客户端不再自己塞 cf_clearance"
+    assert cookies["kun-galgame-patch-moe-token"] == "t"
+
+    http = core_http.Http(tuned)
+    ticket = http._manual_pass
+    assert ticket is not None
+    assert ticket.cookies == {"cf_clearance": token}
+    assert ticket.user_agent == "UA/1", "重放时必须带上配套的 UA"
+    assert ticket.headers == {"user-agent": "UA/1"}
+
+    headers: dict[str, str] = {}
+    jar: dict[str, str] = {}
+    http._attach_pass("www.example.com", headers, jar)
+    assert jar == {} and headers == {}, "没验证过的站点不该收到 cookie"
+
+    assert core_http.Http(Settings.from_config({}))._manual_pass is None
+
+    verdict = http._manual_verdict("www.example.com")
+    assert "出口 IP" in verdict and token not in verdict, "提示要点出原因，且不能回显 cookie"
 
 
 def test_plain_markup_strips_vndb_bbcode() -> None:

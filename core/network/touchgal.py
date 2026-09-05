@@ -23,12 +23,14 @@ from ..types import (
     TouchGalResponse,
 )
 from ..utils import clip
-from .http import Http
+from .http import Http, ua_for_profile
 
 _BROWSER_UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+    "(KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
 )
+"""兜底 UA。默认与 TLS 指纹档位的默认值 chrome136 同版本：声明的浏览器版本
+和握手指纹对不上，本身就是一条会被风控盯上的特征。"""
 
 _NSFW_COOKIE = "kun-patch-setting-store|state|data|kunNsfwEnable"
 
@@ -59,22 +61,37 @@ class TouchGal:
         return self._http.challenged(self.base)
 
     @property
+    def _user_agent(self) -> str:
+        """本次请求声明的 User-Agent。
+
+        优先用用户填的浏览器 UA：cf_clearance 与签发它的 UA 一起被签进签名，
+        只有两者同源才有机会通过验证。没填时按配置的 TLS 指纹档位推一个同版本
+        的 UA，避免出现「指纹说 Chrome 136、UA 说 Chrome 147」这种自相矛盾的组合。
+        """
+        safety = self._settings.safety
+        return safety.browser_ua or ua_for_profile(safety.tls, _BROWSER_UA)
+
+    @property
     def _headers(self) -> dict[str, str]:
         return {
             "Content-Type": "application/json",
-            "user-agent": _BROWSER_UA,
+            "user-agent": self._user_agent,
             "referer": self.base,
             "x-requested-with": "kun-fetch",
         }
 
     @property
     def _cookies(self) -> dict[str, str]:
+        """站点自身需要的 Cookie。
+
+        这里不放 cf_clearance：它由 Http 在真正命中验证时统一挂上并重放，验证
+        通过后才缓存复用。放在这里会让一串早已失效的 cookie 跟着每个请求出门，
+        既看不出它是死的，也让日志无法说清失败到底是哪一环。
+        """
         safety = self._settings.safety
         cookies = {_NSFW_COOKIE: "all" if safety.enable_nsfw else "sfw"}
         if safety.touchgal_token:
             cookies["kun-galgame-patch-moe-token"] = safety.touchgal_token
-        if safety.cf_clearance:
-            cookies["cf_clearance"] = safety.cf_clearance
         return cookies
 
     # -- 接口 -------------------------------------------------------------- #
