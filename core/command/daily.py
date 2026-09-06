@@ -24,7 +24,7 @@ from ..utils import (
 )
 from .base import Composer, feature
 
-_LOG = "[视觉小说工房]"
+_LOG = "[Gal工房]"
 
 _NO_INTRO = "TouchGal暂无该作品简介。"
 

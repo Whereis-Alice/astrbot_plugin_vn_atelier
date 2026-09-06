@@ -36,7 +36,7 @@ from ..utils import (
 )
 from .base import BaseCommand, feature
 
-_LOG = "[视觉小说工房]"
+_LOG = "[Gal工房]"
 
 _NEXT_WORDS = frozenset({"换一个", "换一张", "下一个", "next"})
 _STOP_WORDS = frozenset({"结束", "停止", "退出", "stop"})

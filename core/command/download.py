@@ -29,7 +29,7 @@ from .base import BaseCommand
 
 _VNDB_ID = re.compile(r"v\d+")
 
-_NICKNAME = "视觉小说工房"
+_NICKNAME = "Gal工房"
 
 
 class DownloadCommand(BaseCommand):

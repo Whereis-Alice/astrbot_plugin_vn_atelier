@@ -37,7 +37,7 @@ from ..utils import (
 )
 from .base import BaseCommand, card, dossier, section
 
-_LOG = "[视觉小说工房]"
+_LOG = "[Gal工房]"
 _URL = re.compile(r"https?://\S+")
 
 

@@ -53,7 +53,7 @@ class HelpCommand(BaseCommand):
                 group("个人", [row(name, desc) for name, desc in _PERSONAL]),
                 group("管理员", [row(name, desc) for name, desc in _ADMIN]),
             ],
-            title="视觉小说工房",
+            title="Gal工房",
             subtitle="主指令 工房，也可用 vna / gal工房",
             notes=(
                 f"可选主题：{themes}",

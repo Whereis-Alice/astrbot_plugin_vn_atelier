@@ -14,7 +14,7 @@ from astrbot.api import logger
 
 from ..settings import Settings
 
-_LOG = "[视觉小说工房]"
+_LOG = "[Gal工房]"
 
 _BROWSER_UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "

@@ -1,4 +1,4 @@
-"""视觉小说工房（astrbot_plugin_vn_atelier）插件入口。
+"""Gal工房（astrbot_plugin_vn_atelier）插件入口。
 
 这个文件只做三件事：
 
@@ -46,7 +46,7 @@ from .core.service import TOOL_NAMES, build_tools
 from .core.types import EarlyReturn, Tips
 from .core.utils import brief
 
-_LOG = "[视觉小说工房]"
+_LOG = "[Gal工房]"
 _PLUGIN_NAME = "astrbot_plugin_vn_atelier"
 _JOB_NAME = "vn_atelier:daily_digest"
 
@@ -55,7 +55,7 @@ _CRASHED = "出了点意外，指令没能执行完。详细原因已写进 Astr
 
 
 class VnAtelierPlugin(Star):
-    """视觉小说工房。"""
+    """Gal工房。"""
 
     def __init__(self, context: Context, config: AstrBotConfig) -> None:
         super().__init__(context)
@@ -136,7 +136,7 @@ class VnAtelierPlugin(Star):
                 name=_JOB_NAME,
                 cron_expression=schedule.cron_expression,
                 handler=self._push_today,
-                description="视觉小说工房 · 每日简讯推送",
+                description="Gal工房 · 每日简讯推送",
                 enabled=True,
                 persistent=False,
             )
@@ -245,7 +245,7 @@ class VnAtelierPlugin(Star):
 
     @filter.command_group("工房", alias={"vna", "VNA", "gal工房"})
     async def atelier(self, event: AstrMessageEvent):
-        """视觉小说工房主指令，发送「工房 帮助」查看全部子指令。"""
+        """Gal工房主指令，发送「工房 帮助」查看全部子指令。"""
 
     @atelier.command("作品", alias={"游戏", "vn"})
     async def vn(self, event: AstrMessageEvent, keyword: str = ""):

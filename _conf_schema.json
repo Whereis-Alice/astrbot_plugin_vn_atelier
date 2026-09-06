@@ -16,7 +16,7 @@
       },
       "requestTimeout": {
         "description": "单次请求超时（秒）",
-        "hint": "一次网络请求最长等待时间。网络较慢或走代理时建议 45 秒以上。",
+        "hint": "一次网络请求最长等待时间。网络较慢、走代理或走反代时建议 45 秒以上（浏览器反代冷启动可能要十几秒）。",
         "type": "int",
         "slider": {
           "min": 5,
@@ -171,7 +171,7 @@
       },
       "touchgalBase": {
         "description": "TouchGal 站点地址",
-        "hint": "TouchGal 换域名时改这里即可，无需等插件更新（历史上从 touchgal.top 换到过 touchgal.ink）。必须以 http:// 或 https:// 开头。",
+        "hint": "TouchGal 换域名时改这里即可，无需等插件更新（历史上从 touchgal.top 换到过 touchgal.ink）。必须以 http:// 或 https:// 开头，结尾斜杠会自动补上。也可以填一个反代地址（可带路径前缀）：机房 IP 被浏览器验证拦住时，仓库 extras/cf-worker-relay 提供了一个现成的 Cloudflare Worker 反代，部署后把它的地址填在这里即可，同时建议把上面的「单次请求超时」调到 60。",
         "type": "string",
         "default": "https://www.touchgal.ink/"
       },
@@ -183,7 +183,7 @@
       },
       "cfClearance": {
         "description": "Cloudflare cf_clearance",
-        "hint": "可选，应急用。站点开启浏览器验证（日志出现「浏览器验证」或 403）时，可以从浏览器 Cookie 里复制 cf_clearance 的值填进来，只填值本身，不要带「cf_clearance=」和后面的分号（带了会自动截掉并在日志里提醒）。务必知道它的限制：这串 cookie 与签发它的出口 IP、User-Agent 一起签名，从自己电脑复制到机房服务器上一定无效，且有效期通常只有几十分钟。只有 AstrBot 与浏览器走同一个出口时才值得填，并且必须同时填下面的「浏览器 User-Agent」。想长期自动生效请用 FlareSolverr。",
+        "hint": "可选，应急用。站点开启浏览器验证（日志出现「浏览器验证」或 403）时，可以从浏览器 Cookie 里复制 cf_clearance 的值填进来，只填值本身，不要带「cf_clearance=」和后面的分号（带了会自动截掉并在日志里提醒）。务必知道它的限制：这串 cookie 与签发它的出口 IP、User-Agent 一起签名，从自己电脑复制到机房服务器上一定无效，且有效期通常只有几十分钟。只有 AstrBot 与浏览器走同一个出口时才值得填，并且必须同时填下面的「浏览器 User-Agent」。想长期自动生效请用 FlareSolverr 或「TouchGal 站点地址」里说的 Worker 反代。",
         "type": "string",
         "default": ""
       },
@@ -195,7 +195,7 @@
       },
       "solverUrl": {
         "description": "浏览器验证求解服务",
-        "hint": "可选，填 FlareSolverr 的地址，例如 http://127.0.0.1:8191。它内部跑真实浏览器，是唯一能自动通过 Cloudflare JS 验证的办法。必须与 AstrBot 共用同一出口 IP（一般装在同一台机器上），否则取回的凭证无效。留空则关闭该功能。",
+        "hint": "可选，填 FlareSolverr 的地址，例如 http://127.0.0.1:8191。它内部跑真实浏览器，能自动通过 Cloudflare 的 JS 验证。必须与 AstrBot 共用同一出口 IP（一般装在同一台机器上），否则取回的凭证无效。注意它常驻占用约 700 MB ~ 1 GB 内存，1 GB 内存的小服务器请改用「TouchGal 站点地址」里说的 Worker 反代。留空则关闭该功能。",
         "type": "string",
         "default": ""
       },

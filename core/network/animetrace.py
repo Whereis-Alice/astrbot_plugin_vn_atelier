@@ -11,7 +11,7 @@ from ..types import AnimeTraceResponse, ResponseException, Tips
 from ..utils import FileIO
 from .http import Http
 
-_LOG = "[视觉小说工房]"
+_LOG = "[Gal工房]"
 
 _SEARCH_URL = "https://api.animetrace.com/v1/search"
 _MODEL_URL = "https://api.animetrace.com/v1/model/list"

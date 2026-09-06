@@ -39,7 +39,7 @@ from ..utils import clip
 
 ResType = Literal["text", "json", "bytes"]
 
-_LOG = "[视觉小说工房]"
+_LOG = "[Gal工房]"
 
 _JSON_HEADERS = {"Content-Type": "application/json"}
 

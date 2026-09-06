@@ -20,7 +20,7 @@ from ..types import Base64, CacheGroup
 from ..utils import FileIO
 from .cache import ImageCache
 
-_LOG = "[视觉小说工房]"
+_LOG = "[Gal工房]"
 
 _ERROR_IMAGE = ("image", "error.jpg")
 

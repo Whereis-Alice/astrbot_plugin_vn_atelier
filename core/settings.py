@@ -500,7 +500,7 @@ class Settings:
     def log_warnings(self) -> None:
         """把解析期收集到的配置问题写进日志。"""
         for problem in self.warnings:
-            logger.warning("[视觉小说工房] 配置项需要检查：%s", problem)
+            logger.warning("[Gal工房] 配置项需要检查：%s", problem)
 
 
 def _parse_clock(value: str) -> tuple[int, int, str | None]:

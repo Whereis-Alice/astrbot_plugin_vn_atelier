@@ -24,7 +24,7 @@ from ..settings import Settings
 from ..types import CacheGroup, NoCacheException
 from ..utils import FileIO, to_jpeg_async
 
-_LOG = "[视觉小说工房]"
+_LOG = "[Gal工房]"
 
 _DIR_NAME = "image_cache"
 

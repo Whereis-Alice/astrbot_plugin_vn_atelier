@@ -20,7 +20,7 @@ from pydantic.dataclasses import dataclass
 from ..types import CommandType, Tips
 from ..utils import character_lines, clip, producer_lines, vn_lines
 
-_LOG = "[视觉小说工房]"
+_LOG = "[Gal工房]"
 
 _MAX_ITEMS = 3
 """单次工具调用最多返回的条目数，避免刷爆模型上下文。"""

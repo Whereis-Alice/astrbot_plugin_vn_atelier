@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="logo.png" width="116" alt="视觉小说工房">
+<img src="logo.png" width="116" alt="Gal工房">
 
-<h1>视觉小说工房 · VN Atelier</h1>
+<h1>Gal工房 · VN Atelier</h1>
 
 <p><b>AstrBot 的视觉小说（Galgame）资料助手</b></p>
 
@@ -12,7 +12,7 @@
 </p>
 
 <p>
-<img alt="version" src="https://img.shields.io/badge/version-v3.1.0-6c7ee1">
+<img alt="version" src="https://img.shields.io/badge/version-v3.3.0-6c7ee1">
 <img alt="AstrBot" src="https://img.shields.io/badge/AstrBot-%E2%89%A5%204.16-4c8dff">
 <img alt="Python" src="https://img.shields.io/badge/Python-3.10%2B-3776ab">
 <img alt="License" src="https://img.shields.io/badge/License-AGPL--3.0-9b6fd6">
@@ -79,7 +79,7 @@
 
 **方式一 · 插件市场（推荐）**
 
-AstrBot WebUI → 插件市场 → 搜索「视觉小说工房」→ 安装。
+AstrBot WebUI → 插件市场 → 搜索「Gal工房」→ 安装。
 
 **方式二 · 填仓库地址**
 
@@ -244,7 +244,7 @@ git clone https://github.com/Whereis-Alice/astrbot_plugin_vn_atelier.git
 <summary><b>只收到纯文本，图片发不出来</b></summary>
 
 图片渲染走的是 AstrBot 自带的截图服务，插件只是把 HTML 交给它。收到纯文本说明渲染这一步失败了，兜底逻辑生效了。
-到 AstrBot 日志里搜 `[视觉小说工房]` 看具体原因，最常见的是宿主机不能访问截图服务，或者一次要渲染的封面太多导致超时 —— 后者可以把「每个厂商展示的作品数」「榜单展示条数」调小。
+到 AstrBot 日志里搜 `[Gal工房]` 看具体原因，最常见的是宿主机不能访问截图服务，或者一次要渲染的封面太多导致超时 —— 后者可以把「每个厂商展示的作品数」「榜单展示条数」调小。
 
 </details>
 
@@ -260,7 +260,7 @@ git clone https://github.com/Whereis-Alice/astrbot_plugin_vn_atelier.git
 <details>
 <summary><b>「工房 下载」查不到资源，或者日志里全是 403</b></summary>
 
-TouchGal 有 Cloudflare 防护，403 分两种，处理方式完全不同。先到日志里搜 `[视觉小说工房]` 对号入座：
+TouchGal 有 Cloudflare 防护，403 分两种，处理方式完全不同。先到日志里搜 `[Gal工房]` 对号入座：
 
 **一、只是被客户端指纹拦下** —— 日志出现「转用浏览器指纹重试」，之后请求正常。
 
@@ -296,11 +296,27 @@ python -c "from curl_cffi import requests as r; x = r.get('https://www.touchgal.
 服务器输出 `403 challenge`、自己电脑输出 `200 -`，就说明问题完全在出口 IP 上，跟 cookie、UA、指纹都无关。
 （记得用 AstrBot 自己的 Python 跑，例如 `/root/AstrBot/.venv/bin/python`，系统 Python 里通常没装 `curl_cffi`。）
 
-三种解法，按推荐程度排列：
+⚠️ **先劝退一条弯路：普通反代不管用。** 自己搭 nginx 反代、写一个普通的 Cloudflare Worker 转发、
+或者用公共 CORS 代理，都过不了这一关。因为 Cloudflare 还会看客户端的 TLS 指纹，
+而这类转发要么带的是服务器自己的指纹，要么（Worker 转发同在 Cloudflare 的站点时）**连 TLS 握手都不存在**
+—— 实测经普通 Worker 转发时，上游看到的是 `tls=off`、`http=unknown`，必被判定为机器人。
+真正有效的是下面这四种。
+
+四种解法，按推荐程度排列：
 
 1. **配代理**（配置项「代理地址」）—— 让插件换一个没被拦的出口，通常一填就好。
    如果你自己电脑上访问正常，把手边现成的代理填进来是最快的办法。
-2. **部署 FlareSolverr**（配置项「浏览器验证求解服务」）—— 一个用真实无头浏览器代跑验证的小服务，是**唯一能长期自动续证**的方案。
+2. **挂一个 Cloudflare Worker 反代**（仓库自带，见 [extras/cf-worker-relay](extras/cf-worker-relay/)）
+   —— 没有代理可用时的首选。它在 Cloudflare 上开一个真实的无头 Chrome 去访问站点，
+   所以机房 IP 也能过，而且**不占你服务器一点内存**。
+
+   部署完只改两个配置项，零代码改动：「TouchGal 站点地址」填 Worker 地址（形如
+   `https://xxx.workers.dev/你的口令/`，结尾斜杠漏了插件会自动补），「单次请求超时」从 30 调到 60（浏览器冷启动会慢）。
+
+   代价是 Cloudflare 免费版每天只给 **10 分钟浏览器运行时长**、新建浏览器实例约 **1 次/分钟**。
+   Worker 里做了会话复用和 10 分钟响应缓存把消耗压到最低，实测「搜索 + 详情 + 资源列表」一整套约花 10 秒，
+   所以**每天几十次查询很宽裕，高频刷不合适**。详细部署步骤和排错都在那个目录的 README 里。
+3. **部署 FlareSolverr**（配置项「浏览器验证求解服务」）—— 一个用真实无头浏览器代跑验证的小服务，是**唯一能长期自动续证**的方案。
    填上地址后，插件遇到验证会自动向它换取通行证、重放请求，并把通行证复用 15 分钟。
    它同样要求与 AstrBot 出口 IP 相同，所以一般直接跑在同一台机器上：
 
@@ -309,7 +325,9 @@ python -c "from curl_cffi import requests as r; x = r.get('https://www.touchgal.
    ```
 
    然后把 `http://127.0.0.1:8191` 填进「浏览器验证求解服务」。
-3. **手填通行证**（配置项「Cloudflare cf_clearance」+「浏览器 User-Agent」）—— 只是应急手段，成功率不高。
+
+   注意它对内存要求不低（实测常驻 700 MB ~ 1 GB），1 GB 内存的小服务器上会把 AstrBot 一起拖崩，那种机器请选第 2 种。
+4. **手填通行证**（配置项「Cloudflare cf_clearance」+「浏览器 User-Agent」）—— 只是应急手段，成功率不高。
    因为这张通行证同时绑定三样东西：**出口 IP、浏览器 UA、站点域名**，Cloudflare 会核对签名，
    从自己电脑上复制一串值贴给云服务器一定通不过。想让它有机会生效，三条必须同时满足：
 
@@ -403,6 +421,9 @@ python tests/test_smoke.py     # 也可以用 pytest tests
 并确认用户数据里的 `<script>` 无法越出页面。
 提 PR 前请顺手跑一下 `ruff check .` 与 `ruff format .`。
 
+`extras/` 目录放的是可选的外部组件，不会被插件加载，也不参与自检 —— 目前有一个
+[Cloudflare Worker 反代](extras/cf-worker-relay/)，用来绕过 TouchGal 的浏览器验证。
+
 ---
 
 ## 数据来源
@@ -434,5 +455,5 @@ python tests/test_smoke.py     # 也可以用 pytest tests
 ---
 
 <div align="center">
-<sub>如果这个插件帮上了忙，欢迎给个 Star。发现问题请开 Issue，附上 AstrBot 日志里带 [视觉小说工房] 的那几行会快很多。</sub>
+<sub>如果这个插件帮上了忙，欢迎给个 Star。发现问题请开 Issue，附上 AstrBot 日志里带 [Gal工房] 的那几行会快很多。</sub>
 </div>

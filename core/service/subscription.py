@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 
 from ..settings import Settings
 
-_LOG = "[视觉小说工房]"
+_LOG = "[Gal工房]"
 
 _PUSH_KEY = "push_sessions"
 _COLLECTION_PREFIX = "collection:"

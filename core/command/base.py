@@ -42,7 +42,7 @@ from ..types import (
 )
 from ..utils import character_lines, producer_lines, vn_lines
 
-_LOG = "[视觉小说工房]"
+_LOG = "[Gal工房]"
 
 # 支持合并转发的平台。上游把 qq_official 也算进去，但官方机器人接口
 # 并不支持合并转发节点，实际会静默丢消息。

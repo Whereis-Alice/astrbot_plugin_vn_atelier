@@ -38,7 +38,7 @@ class FileIO:
             async with aiofiles.open(path, "wb") as handle:
                 await handle.write(data)
         except OSError as error:
-            logger.warning("[视觉小说工房] 写入文件失败 %s：%s", path, error)
+            logger.warning("[Gal工房] 写入文件失败 %s：%s", path, error)
             return False
         return True
 
@@ -65,7 +65,7 @@ class FileIO:
             async with aiofiles.open(path, "w", encoding=encoding) as handle:
                 await handle.write(text)
         except OSError as error:
-            logger.warning("[视觉小说工房] 写入文件失败 %s：%s", path, error)
+            logger.warning("[Gal工房] 写入文件失败 %s：%s", path, error)
             return False
         return True
 

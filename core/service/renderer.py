@@ -31,7 +31,7 @@ from ..settings import Settings
 from ..types import THEME_LABELS, Layout, RenderException, Theme
 from ..utils import FileIO
 
-_LOG = "[视觉小说工房]"
+_LOG = "[Gal工房]"
 
 _BRAND = "VISUAL NOVEL ATELIER"
 

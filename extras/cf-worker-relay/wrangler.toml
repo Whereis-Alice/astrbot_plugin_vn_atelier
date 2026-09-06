@@ -1,0 +1,15 @@
+# Cloudflare Worker 反代（Browser Rendering 版）
+# 部署：npx --yes wrangler@4 deploy
+
+name = "touchgal-relay"
+main = "worker.js"
+compatibility_date = "2026-09-01"
+workers_dev = true
+
+# 反代目标站点。站点换域名时改这一行即可，不必动代码。
+[vars]
+UPSTREAM = "https://www.touchgal.ink"
+
+# Browser Rendering 绑定：整套方案就靠它跑一个真实 Chrome。
+[browser]
+binding = "BROWSER"

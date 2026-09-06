@@ -36,7 +36,7 @@ from ..utils import (
 )
 from .base import BaseCommand, feature
 
-_LOG = "[视觉小说工房]"
+_LOG = "[Gal工房]"
 
 _VNDB_DESC_LIMIT = 12
 """VNDB 简介最多保留的段落数。个别条目的简介很长，全量渲染会把卡片拉爆。"""

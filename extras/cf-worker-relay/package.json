@@ -1,0 +1,15 @@
+{
+  "name": "touchgal-relay",
+  "private": true,
+  "description": "Cloudflare Worker relay for Gal工房 (AstrBot astrbot_plugin_vn_atelier)",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "dependencies": {
+    "@cloudflare/puppeteer": "^1.0.4"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

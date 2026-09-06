@@ -1,4 +1,4 @@
-"""视觉小说工房（astrbot_plugin_vn_atelier）核心实现包。
+"""Gal工房（astrbot_plugin_vn_atelier）核心实现包。
 
 分层约定：
 

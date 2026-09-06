@@ -27,7 +27,7 @@ from .service import (
 from .settings import Settings
 from .types import THEME_LABELS, Theme
 
-_LOG = "[视觉小说工房]"
+_LOG = "[Gal工房]"
 
 
 class AtelierRuntime:
