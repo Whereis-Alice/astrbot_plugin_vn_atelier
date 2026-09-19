@@ -183,19 +183,19 @@
       },
       "cfClearance": {
         "description": "Cloudflare cf_clearance",
-        "hint": "可选，应急用。站点开启浏览器验证（日志出现「浏览器验证」或 403）时，可以从浏览器 Cookie 里复制 cf_clearance 的值填进来，只填值本身，不要带「cf_clearance=」和后面的分号（带了会自动截掉并在日志里提醒）。务必知道它的限制：这串 cookie 与签发它的出口 IP、User-Agent 一起签名，从自己电脑复制到机房服务器上一定无效，且有效期通常只有几十分钟。只有 AstrBot 与浏览器走同一个出口时才值得填，并且必须同时填下面的「浏览器 User-Agent」。想长期自动生效请用 FlareSolverr 或「TouchGal 站点地址」里说的 Worker 反代。",
+        "hint": "可选。只填 cf_clearance 的值，误带前缀或整段 Cookie 时会自动截取。凭证可能过期，也可能因出口 IP、客户端环境或站点策略变化失效；迁移服务器后请勿假定旧值仍然有效。配套填写取值浏览器的 User-Agent；失败后可清空旧值。部署过 Worker 时，请先核对「TouchGal 站点地址」，仅部署 Worker 不会自动启用。",
         "type": "string",
         "default": ""
       },
       "browserUa": {
         "description": "浏览器 User-Agent",
-        "hint": "只在填了 cf_clearance 时需要，必须来自同一个浏览器，否则那串 cookie 一定通不过验证。取法：在该浏览器地址栏访问 https://www.whatismybrowser.com/detect/what-is-my-user-agent/ ，或在开发者工具 Network 面板里复制任意请求的 user-agent 请求头。留空时插件按下面的 TLS 指纹档位自动推一个同版本的 UA。",
+        "hint": "填写手动 cf_clearance 时，建议同时填写取得它的浏览器 User-Agent。留空会按 TLS 指纹档位推导默认 UA，但插件无法确认它是否与原浏览器一致。填写 UA 也不保证验证通过。",
         "type": "string",
         "default": ""
       },
       "solverUrl": {
         "description": "浏览器验证求解服务",
-        "hint": "可选，填 FlareSolverr 的地址，例如 http://127.0.0.1:8191。它内部跑真实浏览器，能自动通过 Cloudflare 的 JS 验证。必须与 AstrBot 共用同一出口 IP（一般装在同一台机器上），否则取回的凭证无效。注意它常驻占用约 700 MB ~ 1 GB 内存，1 GB 内存的小服务器请改用「TouchGal 站点地址」里说的 Worker 反代。留空则关闭该功能。",
+        "hint": "可选，填自己管理的 FlareSolverr 地址，例如 http://127.0.0.1:8191。浏览器会消耗额外内存，使用前评估可用内存与并发。取得的凭证需要兼容客户端环境，服务不能保证通过所有验证。留空则关闭。",
         "type": "string",
         "default": ""
       },

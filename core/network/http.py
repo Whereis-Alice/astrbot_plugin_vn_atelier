@@ -10,14 +10,11 @@
 
 所以命中验证时会立刻停手，把该站点熔断一小段时间，并且只写一条带解决办法
 的警告。在熔断之前还会依次试两条出路：先用用户手填的 cf_clearance 重放一次，
-再请 FlareSolverr 用真实浏览器现场过一次挑战——后者是唯一真正稳定的路子。
+再尝试已配置的 FlareSolverr；两种方式都不保证验证成功。
 
-关于「为什么手填的 cf_clearance 经常没用」：这张 cookie 的签名里含签发时的
-出口 IP 与 User-Agent。在自己电脑的浏览器里取、再粘到机房服务器上用，两个
-出口 IP 不同，Cloudflare 一律不认。而验证本身多半就是按出口 IP 的信誉触发的
-——家用宽带直接放行、机房 IP 一律拦，于是「本地能开网页、服务器上 403」成了
-最常见的现象。所以手填只在「AstrBot 与浏览器同出口」时才有意义，这一层会把
-这个结论直接写进日志，而不是让用户对着 403 反复试。
+cf_clearance 的有效性受有效期、客户端环境和站点策略影响。迁移服务器后，
+旧值不能视为仍然有效；未填写 UA 也不等于已经证明 UA 不匹配。
+日志只报告实际响应与配置状态，不把可能原因写成确定结论。
 """
 
 from __future__ import annotations
@@ -72,14 +69,11 @@ _SOLVER_TIMEOUT_MS: Final = 60000
 """留给 FlareSolverr 跑完挑战的时间。真实浏览器启动 + 等待 JS 需要几十秒。"""
 
 _ADVICE = (
-    "验证通常是按出口 IP 的信誉触发的：家用宽带直接放行，机房 IP 几乎必然中招，"
-    "所以「我电脑上能打开」并不代表服务器上也能。三种解法"
-    "（详见 README「站点开启浏览器验证怎么办」）："
-    "① 配置代理，把请求换到一个没被拦的出口；"
-    "② 部署 FlareSolverr 并填写「浏览器验证求解服务」，让它在本机用真实浏览器现场求解，"
-    "这是唯一能长期自动生效的办法；"
-    "③ 手填 cf_clearance 并配套填写「浏览器 User-Agent」，"
-    "但它与签发时的出口 IP 绑定，只有 AstrBot 与浏览器同出口时才有效。"
+    "请先核对「TouchGal 站点地址」：部署过 Worker 不会自动启用，"
+    "需要在当前实例中填写完整地址（含访问口令路径）。"
+    "迁移服务器后还应检查代理配置，并清理已失效的旧 cf_clearance。"
+    "验证可能与出口 IP、客户端环境或站点策略有关，不能仅凭 403 确定原因。"
+    "配置说明见 README「站点开启浏览器验证怎么办」。"
 )
 
 _CLEARANCE_EPOCH_LOW: Final = 1_500_000_000
@@ -183,9 +177,8 @@ def origin_of(url: str) -> str:
 class Clearance:
     """一张浏览器验证通行证。
 
-    cf_clearance 与「取得它的出口 IP + 当时的 User-Agent」三者绑定，换掉任何
-    一个都会立刻失效。这正是从自己电脑上复制 cookie 到服务器往往不生效的原因，
-    也是这里必须把 UA 一起存下来、重放时原样带上的原因。
+    尽量保持取得它时的出口与 User-Agent。改变客户端环境可能使验证失效，
+    因此把 UA 一起存下来，重放时原样带上；最终以站点实际响应为准。
     """
 
     cookies: dict[str, str] = field(default_factory=dict)
@@ -508,17 +501,20 @@ class Http:
         )
 
     def _manual_verdict(self, host: str) -> str:
-        """手填的通行证没通过时，把最可能的真实原因直接说出来。"""
+        """报告失败事实与配置线索，不把推测当成验证失败的确定原因。"""
         safety = self._settings.safety
         age = describe_age(clearance_issued_at(safety.cf_clearance))
         ua_note = (
-            "UA 已配套填写" if safety.browser_ua else "且没有填「浏览器 User-Agent」，UA 必然对不上"
+            "已填写「浏览器 User-Agent」，未验证是否与取值浏览器一致"
+            if safety.browser_ua
+            else "未填写「浏览器 User-Agent」，无法确认是否与取值浏览器一致"
         )
         return (
             f"手填的 cf_clearance 通不过 {host} 的验证（{age}，{ua_note}）。"
-            "这串 cookie 与签发它的出口 IP 绑定，在自己电脑上取、拿到另一台机器上用，"
-            "Cloudflare 一律不认。要让它生效只有两条路：用代理把插件的出口换成与浏览器"
-            "相同的那一个，或者干脆改用 FlareSolverr 在本机现场求解。"
+            "可能原因包括凭证过期、出口 IP 或客户端环境变化、站点策略变化。"
+            "以上时间来自 cookie 格式推测，不能据此确定有效期。"
+            "本次验证已失败，将不再反复重试同一值；可清空旧值。"
+            "如果迁移前使用 Worker，请核对当前「TouchGal 站点地址」是否仍是直连地址。"
         )
 
     def _attach_pass(self, host: str, headers: dict[str, str], jar: dict[str, str]) -> None:

@@ -12,7 +12,7 @@
 </p>
 
 <p>
-<img alt="version" src="https://img.shields.io/badge/version-v3.3.0-6c7ee1">
+<img alt="version" src="https://img.shields.io/badge/version-v3.3.1-6c7ee1">
 <img alt="AstrBot" src="https://img.shields.io/badge/AstrBot-%E2%89%A5%204.16-4c8dff">
 <img alt="Python" src="https://img.shields.io/badge/Python-3.10%2B-3776ab">
 <img alt="License" src="https://img.shields.io/badge/License-AGPL--3.0-9b6fd6">
@@ -278,70 +278,26 @@ TouchGal 有 Cloudflare 防护，403 分两种，处理方式完全不同。先�
 <details>
 <summary><b>站点开启浏览器验证怎么办</b></summary>
 
-先确认是不是这种情况，满足任一条即是：日志里出现「开启了浏览器验证」；响应头带 `cf-mitigated: challenge`；
-响应正文是标题为 `Just a moment...` 的等待页。
+日志出现「开启了浏览器验证」、响应头带 `cf-mitigated: challenge`，或正文是 `Just a moment...` 页面，表示站点要求浏览器验证。普通重试通常无法解决。出口 IP、客户端环境、请求行为和站点策略都可能影响结果，不能只凭 403 确定是哪一项。
 
-这是 Cloudflare 的 Managed Challenge：它要求客户端**真的执行一段 JavaScript** 并交回答案，通过后才发一张名为 `cf_clearance` 的通行证。
-换指纹、加请求头、反复重试都没有用 —— 缺的不是「像不像浏览器」，而是「有没有跑 JS」。
+**换服务器后，先核对当前实例的配置。** 升级插件或部署 Worker 都不会自动改掉「TouchGal 站点地址」。如果日志仍指向 `www.touchgal.ink`，请求仍在直连；要使用自己已经部署的 Worker，需要填入它的完整地址（含访问口令路径），并建议把「单次请求超时」设为 60 秒。不要公开包含口令的地址。
 
-**先理解一件事：验证是按出口 IP 的信誉触发的。**
-同一个网址，家用宽带常常连 cookie 都不用带就直接 200，而云服务器、VPS、机房 IP 几乎必然撞上验证页。
-所以「我自己电脑上能打开」并不代表 AstrBot 所在的机器也能打开，这两件事之间没有关系。
-想亲眼确认，就在**服务器上**和**自己电脑上**各跑一次同一个请求，比较两边的输出：
+可选配置及限制：
 
-```bash
-python -c "from curl_cffi import requests as r; x = r.get('https://www.touchgal.ink/api/home/random', impersonate='chrome136', timeout=20); print(x.status_code, x.headers.get('cf-mitigated', '-'))"
-```
+| 方式 | 适用情况与限制 |
+| --- | --- |
+| 已有代理 | 在「代理地址」填写自己管理且可正常访问站点的代理；是否可用以服务器实际请求为准。 |
+| 已有 Browser Rendering Worker | 部署与配置见 [可选 Worker 组件](extras/cf-worker-relay/)。浏览器运行在 Cloudflare，服务器不需要额外运行 Chrome。受免费额度、冷启动及站点策略限制，不保证长期可用。 |
+| FlareSolverr | 在「浏览器验证求解服务」填自己管理的服务地址；浏览器占用额外内存，凭证仍可能失效。它不是唯一方案，也不保证通过所有验证。 |
+| 手填 `cf_clearance` | 仅作临时凭证。尽量保持取值时的出口和浏览器 UA；迁移后旧值可能失效，反复粘贴同一值没有帮助。 |
 
-服务器输出 `403 challenge`、自己电脑输出 `200 -`，就说明问题完全在出口 IP 上，跟 cookie、UA、指纹都无关。
-（记得用 AstrBot 自己的 Python 跑，例如 `/root/AstrBot/.venv/bin/python`，系统 Python 里通常没装 `curl_cffi`。）
+**手填 Cookie 的注意事项：** 只填值本身；不要带 `cf_clearance=` 前缀或整段 Cookie（误填时插件会尝试截取）。「浏览器 User-Agent」填取值浏览器的 UA。没有填 UA 只表示无法确认一致性，并不等于已证实 UA 不匹配。日志里的签发时间是根据 Cookie 格式推测的，不能据此判断确切有效期；已经请求失败的旧值可以清空。
 
-⚠️ **先劝退一条弯路：普通反代不管用。** 自己搭 nginx 反代、写一个普通的 Cloudflare Worker 转发、
-或者用公共 CORS 代理，都过不了这一关。因为 Cloudflare 还会看客户端的 TLS 指纹，
-而这类转发要么带的是服务器自己的指纹，要么（Worker 转发同在 Cloudflare 的站点时）**连 TLS 握手都不存在**
-—— 实测经普通 Worker 转发时，上游看到的是 `tls=off`、`http=unknown`，必被判定为机器人。
-真正有效的是下面这四种。
+**普通反代的测试结果不能泛化。** 此前测试中的普通 Worker 仍返回 403；诊断端点显示 `tls=off`，只说明该请求路径暴露出的连接信息，不能据此断定所有 Worker、nginx 或代理都必然失败。Browser Rendering 版本曾测试成功，也仍需在实际部署环境中验证。
 
-四种解法，按推荐程度排列：
+**免费额度不等于固定查询次数。** 此前 Workers Free 计划提供每天 10 分钟浏览器时长，以 [Cloudflare 当前限制](https://developers.cloudflare.com/browser-rendering/platform/limits/) 为准。浏览器保活等待也会消耗额度：一次查询耗时 10 秒，再保活 30 秒，就不能只按 10 秒估算。缓存有助于减少消耗，但不适合承诺「每天几十次很宽裕」。
 
-1. **配代理**（配置项「代理地址」）—— 让插件换一个没被拦的出口，通常一填就好。
-   如果你自己电脑上访问正常，把手边现成的代理填进来是最快的办法。
-2. **挂一个 Cloudflare Worker 反代**（仓库自带，见 [extras/cf-worker-relay](extras/cf-worker-relay/)）
-   —— 没有代理可用时的首选。它在 Cloudflare 上开一个真实的无头 Chrome 去访问站点，
-   所以机房 IP 也能过，而且**不占你服务器一点内存**。
-
-   部署完只改两个配置项，零代码改动：「TouchGal 站点地址」填 Worker 地址（形如
-   `https://xxx.workers.dev/你的口令/`，结尾斜杠漏了插件会自动补），「单次请求超时」从 30 调到 60（浏览器冷启动会慢）。
-
-   代价是 Cloudflare 免费版每天只给 **10 分钟浏览器运行时长**、新建浏览器实例约 **1 次/分钟**。
-   Worker 里做了会话复用和 10 分钟响应缓存把消耗压到最低，实测「搜索 + 详情 + 资源列表」一整套约花 10 秒，
-   所以**每天几十次查询很宽裕，高频刷不合适**。详细部署步骤和排错都在那个目录的 README 里。
-3. **部署 FlareSolverr**（配置项「浏览器验证求解服务」）—— 一个用真实无头浏览器代跑验证的小服务，是**唯一能长期自动续证**的方案。
-   填上地址后，插件遇到验证会自动向它换取通行证、重放请求，并把通行证复用 15 分钟。
-   它同样要求与 AstrBot 出口 IP 相同，所以一般直接跑在同一台机器上：
-
-   ```bash
-   docker run -d --name flaresolverr -p 8191:8191 --restart unless-stopped ghcr.io/flaresolverr/flaresolverr:latest
-   ```
-
-   然后把 `http://127.0.0.1:8191` 填进「浏览器验证求解服务」。
-
-   注意它对内存要求不低（实测常驻 700 MB ~ 1 GB），1 GB 内存的小服务器上会把 AstrBot 一起拖崩，那种机器请选第 2 种。
-4. **手填通行证**（配置项「Cloudflare cf_clearance」+「浏览器 User-Agent」）—— 只是应急手段，成功率不高。
-   因为这张通行证同时绑定三样东西：**出口 IP、浏览器 UA、站点域名**，Cloudflare 会核对签名，
-   从自己电脑上复制一串值贴给云服务器一定通不过。想让它有机会生效，三条必须同时满足：
-
-   - 取值的浏览器和 AstrBot 走同一个出口（例如两边都经过同一个代理）；
-   - 「浏览器 User-Agent」填上同一个浏览器的 UA，一个字符都不能差（浏览器里打开 https://www.whatismybrowser.com/detect/what-is-my-user-agent/ 就能看到）；
-   - 尽快用掉，有效期通常只有几十分钟。
-
-   填的时候只填值本身，不要带 `cf_clearance=` 前缀，也别把整段 Cookie 贴进来 —— 真贴了插件会自动截取，并在日志里提醒你一次。
-
-插件的实际行为：只有真的撞上验证时，才会把手填的通行证挂上去重放一次。通过了就缓存复用；
-不通过就在日志里写清真实原因（包括这串通行证是多久前签发的、有没有配套的 UA），并且**不再拿同一串值反复撞墙** —— 换成新值才会再试。
-
-没解决也不会把日志刷爆：命中验证后插件会把该站点**熔断 300 秒**，期间的请求直接跳过，整轮只留一条警告。
-`工房 随机` 还会自动改用 VNDB 出结果，所以验证期间这条指令照常可用；`工房 下载` 只有 TouchGal 一个来源，得按上面的办法处理。
+插件命中验证后会对该站点冷却 300 秒，避免短时间刷屏。`工房 随机` 会尝试 VNDB 兜底；每日简讯获取 TouchGal 简介失败时，仍会尝试输出其余内容。`工房 下载` 依赖 TouchGal，必须恢复该来源才能正常获取资源。
 
 </details>
 
