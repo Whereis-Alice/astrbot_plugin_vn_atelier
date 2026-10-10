@@ -467,6 +467,21 @@ img { display: block; max-width: 100%; }
 .ft-main > .ft-desc { margin-top: 18px; }
 
 .ft-cards-title { margin-top: 24px; }
+
+/* 评分保留各站量纲，避免把 10 分和 100 分混成一个数字。 */
+.ratings { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0 16px; }
+.rating { flex: 1 1 140px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface-2); }
+.rating__source { font-size: 11px; letter-spacing: .14em; color: var(--accent); font-weight: 700; }
+.rating__value { display: block; font-size: 27px; font-weight: 700; line-height: 1.35; color: var(--ink); }
+.rating__scale { font-size: 12px; font-weight: 400; color: var(--ink-dim); margin-left: 4px; }
+.rating__meta { font-size: 11px; color: var(--ink-dim); }
+.distribution { margin: 22px 0 4px; padding: 16px; border: 1px solid var(--line-soft); border-radius: 5px; background: var(--surface-2); }
+.distribution__title { margin: 0 0 12px; font-size: 13px; color: var(--accent); }
+.distribution__bars { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 8px; }
+.distribution__bin { text-align: center; font-size: 11px; color: var(--ink-dim); }
+.distribution__track { height: 94px; display: flex; align-items: flex-end; justify-content: center; }
+.distribution__bar { width: 100%; background: var(--title-grad); border-radius: 3px 3px 0 0; }
+.distribution__count { display: block; margin-top: 4px; font-size: 10px; }
 </style>
 </head>
 <body>
@@ -490,12 +505,18 @@ img { display: block; max-width: 100%; }
     <main class="bd">
 {#- 卡片是 gallery / dossier / feature 三个布局共用的组件，宏定义在这里，
     各布局只管排版，不重复写一遍 DOM。desc 的换行由插件侧拼成 desc_html。 -#}
+{% macro vna_ratings(items) %}
+{% if items %}<div class="ratings">
+{% for r in items %}<div class="rating"><span class="rating__source">{{ r.source | safe }}</span><strong class="rating__value">{{ r.score | safe }}<small class="rating__scale">{{ r.scale | safe }}</small></strong><div class="rating__meta">{{ r.meta | safe }} · {{ r.rank | safe }}</div></div>{% endfor %}
+</div>{% endif %}
+{% endmacro %}
 {% macro vna_card(c) %}
       <article class="card">
         {% if c.image %}<img class="card__cover" src="{{ c.image | safe }}" alt="">{% endif %}
         <div class="card__body">
           {% if c.badge %}<span class="card__badge">{{ c.badge | safe }}</span>{% endif %}
           {% if c.subtitle %}<h2 class="card__title">{{ c.subtitle | safe }}</h2>{% endif %}
+          {{ vna_ratings(c.ratings) }}
           {% if c.desc_html %}<div class="card__desc">{{ c.desc_html | safe }}</div>{% endif %}
         </div>
       </article>

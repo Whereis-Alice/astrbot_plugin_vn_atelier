@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable, Sized
 from typing import Any
 
@@ -94,8 +95,11 @@ def vn_lines(vn: VndbVnResponse) -> list[str]:
             lines.add_raw(f"{name}标题（{official}）：{title.title}")
 
     lines.add("别名", join_cn(vn.aliases))
-    lines.add("贝叶斯评分", vn.rating)
-    lines.add("平均分", vn.average)
+    if vn.rating is not None:
+        valid = math.isfinite(vn.rating) and 0 < vn.rating <= 100 and vn.votecount != 0
+        lines.add("VNDB 贝叶斯评分（100分制）", vn.rating if valid else "暂无")
+    lines.add("VNDB 平均分（100分制）", vn.average)
+    lines.add("VNDB 评价人数", vn.votecount)
     if vn.length_minutes:
         lines.add("游玩时间", f"{round(vn.length_minutes / 60, 1)}小时")
     developers = [f"{d.original or d.name}（{d.id}）" for d in vn.developers or []]

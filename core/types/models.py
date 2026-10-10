@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # --------------------------------------------------------------------------- #
 # VNDB
@@ -60,6 +60,8 @@ class VndbVnResponse(BaseModel):
     image: Image | None = None
     rating: float | None = None
     average: float | None = None
+    votecount: int | None = None
+    extlinks: list[dict[str, str]] = Field(default_factory=list)
     released: str | None = None
     length_minutes: int | None = None
     platforms: list[str] | None = None
@@ -68,6 +70,17 @@ class VndbVnResponse(BaseModel):
     titles: list[Title] | None = None
     # VNDB 官方简介，带自家的标记语法，展示前需过一遍 utils.plain_markup。
     description: str | None = None
+
+    @field_validator("extlinks", mode="before")
+    @classmethod
+    def clean_extlinks(cls, value: Any) -> list[dict[str, str]]:
+        if not isinstance(value, list):
+            return []
+        return [
+            {"url": item["url"]}
+            for item in value
+            if isinstance(item, dict) and isinstance(item.get("url"), str)
+        ]
 
     @property
     def display_title(self) -> str:

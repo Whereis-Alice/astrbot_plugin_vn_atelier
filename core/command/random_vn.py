@@ -34,6 +34,7 @@ from ..utils import (
     search_lines,
     vn_lines,
 )
+from ..utils.bangumi import match_lines, rating_data
 from .base import BaseCommand, feature
 
 _LOG = "[Gal工房]"
@@ -71,17 +72,24 @@ class RandomCommand(BaseCommand):
             candidates.append(third[1])
         candidates.append(unique_id)
         game = await self._lookup(candidates)
+        match = await self.touchgal_match(details)
+        subject = match.subject
 
         info = search_lines(game, ignore_name=True)
         if len(third) >= 2:
             info.insert(0, f"{third[0]}：{third[1]}")
 
         return feature(
-            main_image=await self.cover(game.banner, CacheGroup.TOUCHGAL),
-            subtitle=game.name or details.title,
-            info=info,
+            main_image=await self.cover(subject.cover, CacheGroup.BANGUMI)
+            if subject and subject.cover
+            else await self.cover(game.banner, CacheGroup.TOUCHGAL),
+            subtitle=subject.display_title if subject else game.name or details.title,
+            info=[*match_lines(match), *info],
+            ratings=rating_data(subject),
             title="随机抽取",
-            desc=paragraphs(details.description),
+            desc=paragraphs(plain_markup(subject.summary))[:12]
+            if subject and subject.summary
+            else paragraphs(details.description),
             previews=await self.covers(details.previews, CacheGroup.TOUCHGAL),
         )
 
@@ -89,15 +97,25 @@ class RandomCommand(BaseCommand):
 
     async def _from_vndb(self) -> dict[str, Any]:
         vn = await self.runtime.vndb.request_random_vn()
+        match = await self.runtime.bangumi.match_vn(vn)
+        subject = match.subject
         info = vn_lines(vn)
         info.append("数据源：VNDB")
         covers = await self.vndb_covers([vn])
         return feature(
-            main_image=covers[0] if covers else await self.error_image(),
-            subtitle=vn.display_title,
-            info=info,
+            main_image=await self.cover(subject.cover, CacheGroup.BANGUMI)
+            if subject and subject.cover
+            else covers[0]
+            if covers
+            else await self.error_image(),
+            subtitle=subject.display_title if subject else vn.display_title,
+            info=[*match_lines(match), *info],
+            ratings=rating_data(subject, vn),
             title="随机抽取",
-            desc=paragraphs(plain_markup(vn.description), _VNDB_DESC_LIMIT),
+            desc=paragraphs(
+                plain_markup(subject.summary if subject and subject.summary else vn.description),
+                _VNDB_DESC_LIMIT,
+            ),
         )
 
     # -- 执行 -------------------------------------------------------------- #

@@ -13,11 +13,14 @@ from ..types import THEME_LABELS, CommandType
 from .base import BaseCommand, group, panel, row
 
 _SEARCH = (
-    ("工房 作品 <关键词>", "按名称检索视觉小说，附评分、平台与制作方"),
+    ("工房 作品 <关键词>", "优先 Bangumi 游戏检索，失败或无结果时回退 VNDB"),
+    ("工房 BGM <关键词/ID/链接>", "Bangumi 游戏查询；精确详情含评分分布与制作信息"),
+    ("工房 BGM排行 [年份] [标签]", "Bangumi 游戏评分榜，受评价人数门槛限制"),
     ("工房 角色 <关键词>", "按名称检索角色档案"),
     ("工房 厂商 <关键词>", "检索会社，并列出其代表作"),
     ("工房 ID <v17/c123/p45>", "用 VNDB ID 精确查询，作品会附中文简介"),
-    ("工房 排行 [年份] [标签]", "按 VNDB 评分出榜，可只看某年或某标签"),
+    ("工房 排行 [年份] [标签]", "默认 Bangumi 游戏评分榜；关闭 Bangumi 后使用 VNDB"),
+    ("工房 VNDB排行 [年份] [标签]", "使用 VNDB 贝叶斯评分出榜"),
 )
 
 _DISCOVER = (
@@ -57,7 +60,8 @@ class HelpCommand(BaseCommand):
             subtitle="主指令 工房，也可用 vna / gal工房",
             notes=(
                 f"可选主题：{themes}",
-                "数据来源：VNDB（元数据）· TouchGal（简介与资源）· AnimeTrace（识图）",
+                "数据来源：Bangumi（优先资料与评分）· VNDB（纪念日与角色）· TouchGal（资源）· AnimeTrace（识图）",
+                "Bangumi 为 10 分制，VNDB 为 100 分制，两站评分不混算。BGM 只查询游戏条目。",
                 "方括号表示可省略参数，尖括号表示必填参数。",
             ),
         )

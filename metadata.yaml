@@ -1,8 +1,8 @@
 name: astrbot_plugin_vn_atelier
 display_name: Gal工房
-desc: 视觉小说（Galgame）资料助手。检索作品 / 角色 / 会社，查评分排行与发售纪念日，标签推荐、随机抽游戏、以图识角色出处、收藏清单与每日简讯推送，结果统一渲染成四套主题的图片卡片。
-short_desc: Galgame 资料助手：作品角色检索、排行、识图出处、每日简讯，输出图片卡片
-version: v3.3.1
+desc: Bangumi 优先的 Galgame 资料助手。查询游戏评分、评价人数、排名与制作信息，为每日推送及作品卡片关联 Bangumi / VNDB 双来源评分；支持角色会社检索、评分榜、随机推荐、识图出处与收藏，提供四套图片主题。
+short_desc: Bangumi 优先：游戏评分与资料、双来源推送卡片、排行与角色检索
+version: v4.0.0
 author: Whereis-Alice
 repo: https://github.com/Whereis-Alice/astrbot_plugin_vn_atelier
 astrbot_version: ">=4.16,<5"
@@ -10,5 +10,7 @@ tags:
   - galgame
   - 视觉小说
   - vndb
+  - bangumi
+  - 评分
   - 图片渲染
   - 资料查询

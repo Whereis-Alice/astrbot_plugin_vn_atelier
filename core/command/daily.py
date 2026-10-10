@@ -20,8 +20,10 @@ from ..utils import (
     character_lines,
     paragraphs,
     parse_touchgal_details_async,
+    plain_markup,
     vn_lines,
 )
+from ..utils.bangumi import match_lines, rating_data
 from .base import Composer, feature
 
 _LOG = "[Gal工房]"
@@ -74,12 +76,24 @@ class DailyDigest(Composer):
 
     async def _build_event_vn(self, date: Sequence[str], stamp: str) -> str:
         vn, characters = await self.runtime.vndb.request_by_event_vn(date)
-        desc, previews = await self._intro(vn.id)
-        cover = (await self.vndb_covers([vn]))[0]
+        match = await self.runtime.bangumi.match_vn(vn)
+        subject = match.subject
+        if subject and subject.summary:
+            desc, previews = paragraphs(plain_markup(subject.summary))[:12], []
+        else:
+            desc, previews = await self._intro(vn.id)
+            if desc == [_NO_INTRO]:
+                desc = paragraphs(plain_markup(vn.description))[:12] or ["暂无简介。"]
+        cover = (
+            await self.cover(subject.cover, CacheGroup.BANGUMI)
+            if subject and subject.cover
+            else (await self.vndb_covers([vn]))[0]
+        )
         data = feature(
             main_image=cover,
-            subtitle=vn.display_title,
-            info=vn_lines(vn),
+            subtitle=subject.display_title if subject else vn.display_title,
+            info=[*match_lines(match), *vn_lines(vn)],
+            ratings=rating_data(subject, vn),
             title=f"{stamp} · 今日发售纪念",
             desc=desc,
             previews=previews,

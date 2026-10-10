@@ -32,8 +32,10 @@ from ..utils import (
     brief,
     paragraphs,
     parse_touchgal_details_async,
+    plain_markup,
     search_lines,
 )
+from ..utils.bangumi import match_lines, rating_data
 from .base import BaseCommand, feature
 
 _LOG = "[Gal工房]"
@@ -50,12 +52,19 @@ class RecommendCommand(BaseCommand):
     async def _render_one(self, item: TouchGalResponse) -> str:
         html = await self.runtime.touchgal.request_html(item.uniqueId)
         details = await parse_touchgal_details_async(html)
+        match = await self.touchgal_match(details)
+        subject = match.subject
         data = feature(
-            main_image=await self.cover(item.banner, CacheGroup.TOUCHGAL),
-            subtitle=item.name or details.title,
-            info=search_lines(item, ignore_name=True),
+            main_image=await self.cover(subject.cover, CacheGroup.BANGUMI)
+            if subject and subject.cover
+            else await self.cover(item.banner, CacheGroup.TOUCHGAL),
+            subtitle=subject.display_title if subject else item.name or details.title,
+            info=[*match_lines(match), *search_lines(item, ignore_name=True)],
+            ratings=rating_data(subject),
             title="标签推荐",
-            desc=paragraphs(details.description),
+            desc=paragraphs(plain_markup(subject.summary))[:12]
+            if subject and subject.summary
+            else paragraphs(details.description),
             previews=await self.covers(details.previews, CacheGroup.TOUCHGAL),
         )
         return await self.render(Layout.FEATURE, data)

@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import calendar
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
@@ -26,6 +27,7 @@ from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, MessageEventResult
 
 from ..runtime import AtelierRuntime
+from ..service.bangumi import BangumiMatch
 from ..settings import Settings
 from ..types import (
     LAYOUT_OF_COMMAND,
@@ -36,11 +38,15 @@ from ..types import (
     InvalidArgsException,
     Layout,
     RenderException,
+    Tips,
+    TouchGalDetails,
     VndbCharacterResponse,
     VndbProducerResponse,
     VndbVnResponse,
 )
+from ..types.bangumi import BangumiSubject
 from ..utils import character_lines, producer_lines, vn_lines
+from ..utils.bangumi import bangumi_lines, match_lines, rating_data
 
 _LOG = "[Gal工房]"
 
@@ -68,6 +74,7 @@ def card(
     subtitle: str = "",
     desc: Sequence[str] = (),
     badge: str = "",
+    ratings: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     """一张封面卡：左图右文。"""
     result: dict[str, Any] = {"image": image}
@@ -78,6 +85,8 @@ def card(
         result["desc"] = lines
     if badge:
         result["badge"] = badge
+    if ratings:
+        result["ratings"] = list(ratings)
     return result
 
 
@@ -144,6 +153,8 @@ def feature(
     previews: Sequence[Base64] = (),
     cards_title: str = "",
     cards: Sequence[Mapping[str, Any]] = (),
+    ratings: Sequence[Mapping[str, Any]] = (),
+    distribution: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     """特写：大封面 + 简介 + 预览图，用于单个作品的详情。"""
     result: dict[str, Any] = {
@@ -151,6 +162,10 @@ def feature(
         "subtitle": subtitle,
         "info": _clean(info),
     }
+    if ratings:
+        result["ratings"] = list(ratings)
+    if distribution:
+        result["distribution"] = list(distribution)
     if title:
         result["title"] = title
     desc_lines = _clean(desc)
@@ -243,16 +258,57 @@ class Composer:
         *,
         badges: Sequence[str] = (),
     ) -> list[dict[str, Any]]:
-        images = await self.vndb_covers(results)
+        matches = await asyncio.gather(*(self.runtime.bangumi.match_vn(vn) for vn in results))
+        images = await asyncio.gather(
+            *(
+                self.cover(match.subject.cover, CacheGroup.BANGUMI)
+                if match.subject and match.subject.cover
+                else self.cover(vn.image.url if vn.image else "", CacheGroup.VNDB)
+                for vn, match in zip(results, matches, strict=True)
+            )
+        )
         return [
             card(
                 image=image,
-                subtitle=vn.display_title,
-                desc=vn_lines(vn),
+                subtitle=match.subject.display_title if match.subject else vn.display_title,
+                desc=[*match_lines(match), *vn_lines(vn)],
+                ratings=rating_data(match.subject, vn),
                 badge=badges[index] if index < len(badges) else "",
             )
-            for index, (vn, image) in enumerate(zip(results, images, strict=True))
+            for index, (vn, image, match) in enumerate(zip(results, images, matches, strict=True))
         ]
+
+    async def bangumi_cards(
+        self, items: Sequence[BangumiSubject], *, badges: Sequence[str] = ()
+    ) -> list[dict[str, Any]]:
+        images = await self.covers([item.cover for item in items], CacheGroup.BANGUMI)
+        return [
+            card(
+                image=image,
+                subtitle=item.display_title,
+                desc=bangumi_lines(item, compact=True),
+                ratings=rating_data(item),
+                badge=badges[index] if index < len(badges) else "",
+            )
+            for index, (item, image) in enumerate(zip(items, images, strict=True))
+        ]
+
+    async def touchgal_match(self, details: TouchGalDetails) -> BangumiMatch:
+        external = details.third_info
+        if not self.settings.bangumi.enabled or not self.settings.bangumi.enrich:
+            return BangumiMatch(status="disabled")
+        if (
+            len(external) >= 2
+            and external[0].lower().startswith("vndb")
+            and external[1].startswith("v")
+        ):
+            try:
+                works = await self.runtime.vndb.request_by_id(CommandType.VN, external[1])
+                if works:
+                    return await self.runtime.bangumi.match_vn(works[0])
+            except Tips:
+                pass
+        return await self.runtime.bangumi.match_title(details.title, external)
 
     async def character_cards(
         self,
@@ -293,6 +349,7 @@ class Composer:
             title=title,
             desc=desc,
             previews=previews,
+            ratings=head.get("ratings") or [],
         )
 
     async def vn_view(

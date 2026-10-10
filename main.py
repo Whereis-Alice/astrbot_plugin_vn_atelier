@@ -22,6 +22,8 @@ from astrbot.api.star import Context, Star, StarTools
 from astrbot.core.star.filter.command import GreedyStr
 
 from .core.command import (
+    BangumiCommand,
+    BangumiRankingCommand,
     CacheCommand,
     CharacterCommand,
     CollectAddCommand,
@@ -248,9 +250,21 @@ class VnAtelierPlugin(Star):
         """Gal工房主指令，发送「工房 帮助」查看全部子指令。"""
 
     @atelier.command("作品", alias={"游戏", "vn"})
-    async def vn(self, event: AstrMessageEvent, keyword: str = ""):
+    async def vn(self, event: AstrMessageEvent, keyword: GreedyStr = ""):
         """按关键词检索视觉小说作品。"""
         async for result in self._run(event, VnCommand, keyword):
+            yield result
+
+    @atelier.command("BGM", alias={"bgm", "Bangumi", "bangumi", "评分"})
+    async def bangumi(self, event: AstrMessageEvent, keyword: GreedyStr = ""):
+        """查询 Bangumi 游戏；支持关键词、条目 ID 和条目链接。"""
+        async for result in self._run(event, BangumiCommand, keyword):
+            yield result
+
+    @atelier.command("BGM排行", alias={"bgm排行", "Bangumi排行", "bangumi排行"})
+    async def bangumi_ranking(self, event: AstrMessageEvent, value: GreedyStr = ""):
+        """Bangumi 游戏评分榜，可筛选年份和标签。"""
+        async for result in self._run(event, BangumiRankingCommand, value):
             yield result
 
     @atelier.command("角色", alias={"人物", "character"})
@@ -279,7 +293,18 @@ class VnAtelierPlugin(Star):
 
     @atelier.command("排行", alias={"榜单", "ranking"})
     async def ranking(self, event: AstrMessageEvent, condition: GreedyStr = ""):
-        """按 VNDB 评分出榜，可附年份与标签，例如「排行 2016 百合」。"""
+        """按 Bangumi 游戏评分出榜，可附年份与标签。"""
+        factory = (
+            BangumiRankingCommand
+            if self.runtime and self.runtime.settings.bangumi.enabled
+            else RankingCommand
+        )
+        async for result in self._run(event, factory, str(condition)):
+            yield result
+
+    @atelier.command("VNDB排行", alias={"vndb排行"})
+    async def vndb_ranking(self, event: AstrMessageEvent, condition: GreedyStr = ""):
+        """明确使用 VNDB 贝叶斯评分出榜。"""
         async for result in self._run(event, RankingCommand, str(condition)):
             yield result
 

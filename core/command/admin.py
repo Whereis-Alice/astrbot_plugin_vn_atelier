@@ -18,7 +18,7 @@ _CLEAN_WORDS = frozenset({"清理", "清空", "clean", "clear"})
 _ON_WORDS = frozenset({"开启", "打开", "订阅", "on"})
 _OFF_WORDS = frozenset({"关闭", "取消", "退订", "off"})
 
-_GROUP_NAMES = {"vndb": "VNDB 封面", "touchgal": "TouchGal 图片"}
+_GROUP_NAMES = {"vndb": "VNDB 封面", "touchgal": "TouchGal 图片", "bangumi": "Bangumi 封面"}
 
 
 def _mb(size: int) -> str:

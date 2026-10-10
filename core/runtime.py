@@ -15,6 +15,7 @@ from typing import Any
 from astrbot.api import logger
 
 from .network import AnimeTrace, Downloader, Http, TouchGal, Vndb
+from .network.bangumi import Bangumi
 from .service import (
     Assets,
     Collection,
@@ -24,6 +25,7 @@ from .service import (
     Renderer,
     Subscription,
 )
+from .service.bangumi import BangumiData
 from .settings import Settings
 from .types import THEME_LABELS, Theme
 
@@ -50,6 +52,7 @@ class AtelierRuntime:
         self.vndb = Vndb(self.http, self.settings)
         self.touchgal = TouchGal(self.http, self.settings)
         self.animetrace = AnimeTrace(self.http, self.settings)
+        self.bangumi = BangumiData(Bangumi(self.settings), self.settings)
 
         self.cache = ImageCache(self.settings, data_dir)
         self.assets = Assets(self.cache, self.downloader, resources)
@@ -70,6 +73,7 @@ class AtelierRuntime:
     async def terminate(self) -> None:
         """释放资源。任一环节失败都不影响其余环节。"""
         for name, target in (
+            ("Bangumi", self.bangumi),
             ("缓存", self.cache),
             ("下载器", self.downloader),
             ("HTTP 会话", self.http),

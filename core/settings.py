@@ -241,6 +241,17 @@ class CharacterSettings:
 
 
 @dataclass(slots=True)
+class BangumiSettings:
+    enabled: bool = True
+    enrich: bool = True
+    token: str = ""
+    timeout: int = 12
+    cache_hours: int = 6
+    results: int = 8
+    min_votes: int = 100
+
+
+@dataclass(slots=True)
 class ProducerSettings:
     producer_vns: int = 9
     """每个厂商展示的作品数，0 表示全部。"""
@@ -321,6 +332,7 @@ class Settings:
     basic: BasicSettings = field(default_factory=BasicSettings)
     render: RenderSettings = field(default_factory=RenderSettings)
     safety: SafetySettings = field(default_factory=SafetySettings)
+    bangumi: BangumiSettings = field(default_factory=BangumiSettings)
     character: CharacterSettings = field(default_factory=CharacterSettings)
     producer: ProducerSettings = field(default_factory=ProducerSettings)
     recommend: RecommendSettings = field(default_factory=RecommendSettings)
@@ -412,6 +424,16 @@ class Settings:
         )
 
         character_raw = _section(config, "characterSetting")
+        bangumi_raw = _section(config, "bangumiSetting")
+        bangumi = BangumiSettings(
+            enabled=_as_bool(bangumi_raw.get("enabled"), True),
+            enrich=_as_bool(bangumi_raw.get("enrichCards"), True),
+            token=_as_str(bangumi_raw.get("accessToken")),
+            timeout=_as_int(bangumi_raw.get("timeout"), 12, 3, 30),
+            cache_hours=_as_int(bangumi_raw.get("cacheHours"), 6, 1, 48),
+            results=_as_int(bangumi_raw.get("results"), 8, 1, 12),
+            min_votes=_as_int(bangumi_raw.get("minVotes"), 100, 0, 10000),
+        )
         if "characterOptions" in character_raw:
             raw_options = _as_list(character_raw.get("characterOptions"))
             keys = {
@@ -485,6 +507,7 @@ class Settings:
             basic=basic,
             render=render,
             safety=safety,
+            bangumi=bangumi,
             character=character,
             producer=producer,
             recommend=recommend,

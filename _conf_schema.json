@@ -447,5 +447,72 @@
         "default": false
       }
     }
+  },
+  "bangumiSetting": {
+    "description": "Bangumi 数据（优先来源）",
+    "type": "object",
+    "items": {
+      "enabled": {
+        "description": "启用 Bangumi",
+        "hint": "作品查询和默认排行优先 Bangumi 游戏条目；作品无结果或不可用时回退 VNDB，评分榜故障不混换来源。关闭后恢复 VNDB。Bangumi API 代理目前支持 HTTP/HTTPS，不能直接使用 socks5 地址。",
+        "type": "bool",
+        "default": true
+      },
+      "enrichCards": {
+        "description": "补充已有卡片与每日推送",
+        "hint": "为 VNDB / TouchGal 作品匹配 Bangumi 资料。优先外链，再检查精确标题与别名；歧义时不挂评分。Bangumi 失败不阻断推送。",
+        "type": "bool",
+        "default": true
+      },
+      "accessToken": {
+        "description": "Bangumi Access Token（可选）",
+        "hint": "公开数据不需要。需要受限条目时在 https://next.bgm.tv/demo/access-token 生成，只填 token。是否能读取仍取决于账号权限；还需开启安全设置里的 NSFW。",
+        "type": "string",
+        "default": ""
+      },
+      "timeout": {
+        "description": "Bangumi 单次超时（秒）",
+        "hint": "独立超时，避免补充分数拖住查询；接口故障或限流时会短暂冷却。",
+        "type": "int",
+        "default": 12,
+        "slider": {
+          "min": 3,
+          "max": 30,
+          "step": 1
+        }
+      },
+      "cacheHours": {
+        "description": "Bangumi 数据缓存（小时）",
+        "hint": "内存缓存，有界容量 256 项；重载即清空。同一请求合并，未匹配或临时失败的结果更早重试。评分可能滞后这一时长，不代表实时评分。",
+        "type": "int",
+        "default": 6,
+        "slider": {
+          "min": 1,
+          "max": 48,
+          "step": 1
+        }
+      },
+      "results": {
+        "description": "Bangumi 搜索结果上限",
+        "type": "int",
+        "default": 8,
+        "slider": {
+          "min": 1,
+          "max": 12,
+          "step": 1
+        }
+      },
+      "minVotes": {
+        "description": "BGM评分榜最低评价人数",
+        "hint": "影响默认 Bangumi 排行及 BGM排行，不影响普通搜索与精确详情。榜单按评分排序，不等于 Bangumi 官方游戏排名。",
+        "type": "int",
+        "default": 100,
+        "slider": {
+          "min": 0,
+          "max": 10000,
+          "step": 50
+        }
+      }
+    }
   }
 }

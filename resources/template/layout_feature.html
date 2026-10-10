@@ -7,10 +7,17 @@
         {% if main_image %}<img class="ft-cover" src="{{ main_image | safe }}" alt="">{% endif %}
         <div class="ft-main">
           {% if subtitle %}<h2 class="ft-name">{{ subtitle | safe }}</h2>{% endif %}
+          {{ vna_ratings(ratings) }}
           {% if info_html %}<div class="ft-info">{{ info_html | safe }}</div>{% endif %}
           {% if desc_html %}<div class="ft-desc">{{ desc_html | safe }}</div>{% endif %}
         </div>
       </div>
+{% if distribution %}
+      <section class="distribution">
+        <h3 class="distribution__title">Bangumi 评分分布 · 柱高按本条目最高票数缩放</h3>
+        <div class="distribution__bars">{% for bin in distribution %}<div class="distribution__bin"><div class="distribution__track"><div class="distribution__bar" style="height: {{ bin.height | int }}px"></div></div>{{ bin.score }} 分<span class="distribution__count">{{ bin.count }} 票</span></div>{% endfor %}</div>
+      </section>
+{% endif %}
 {% if previews %}
       <div class="shots{% if previews | length == 1 %} shots--solo{% elif previews | length == 2 %} shots--duo{% endif %}">
         {% for shot in previews %}<img class="shot" src="{{ shot | safe }}" alt="">{% endfor %}

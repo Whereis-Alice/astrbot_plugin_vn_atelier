@@ -51,7 +51,7 @@ class RankingCommand(BaseCommand):
         layout, data = await self.vn_view(
             results,
             badges=badges,
-            title="评分排行",
+            title="VNDB 评分排行",
             subtitle=f"{scope} · {label}",
         )
         yield await self.picture(data, layout=layout)

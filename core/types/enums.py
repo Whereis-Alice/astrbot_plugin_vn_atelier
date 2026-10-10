@@ -28,6 +28,8 @@ class CommandType(str, Enum):
     RANKING = "ranking"
     COLLECTION = "collection"
     HELP = "help"
+    BANGUMI = "bangumi"
+    BANGUMI_RANKING = "bangumi_ranking"
 
     def __str__(self) -> str:
         return self.value
@@ -69,6 +71,7 @@ class CacheGroup(str, Enum):
 
     VNDB = "vndb"
     TOUCHGAL = "touchgal"
+    BANGUMI = "bangumi"
 
     def __str__(self) -> str:
         return self.value
@@ -96,12 +99,14 @@ LAYOUT_OF_COMMAND: Final[dict[CommandType, Layout]] = {
     CommandType.COLLECTION: Layout.PANEL,
     CommandType.HELP: Layout.PANEL,
     CommandType.DOWNLOAD: Layout.PANEL,
+    CommandType.BANGUMI: Layout.FEATURE,
+    CommandType.BANGUMI_RANKING: Layout.GALLERY,
 }
 """指令到默认布局的映射。ID 指令在拿到简介后会临时切换到 FEATURE。"""
 
 VNDB_FIELDS: Final[dict[str, str]] = {
     "vn": (
-        "id,average,rating,released,length_minutes,platforms,aliases,description,"
+        "id,average,rating,votecount,extlinks.url,released,length_minutes,platforms,aliases,description,"
         "developers{id,original,name},titles{lang,title,official},"
         "image{url},alttitle,title"
     ),
@@ -110,7 +115,7 @@ VNDB_FIELDS: Final[dict[str, str]] = {
         "height,cup,original,image{url},vns{id,alttitle,title}"
     ),
     "producer": "id,name,original,aliases,lang,type",
-    "vn_short": "id,alttitle,title,released,rating,image{url}",
+    "vn_short": "id,alttitle,title,released,rating,votecount,extlinks.url,image{url}",
     "character_short": "id,name,original,aliases,image{url},vns{id,alttitle,title}",
     "character_event": "id,name,aliases,birthday,original,image{url}",
 }

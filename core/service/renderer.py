@@ -168,7 +168,7 @@ class Renderer:
             "font_family": self._font_stack(),
             "brand": _BRAND,
             "theme_label": THEME_LABELS.get(self._settings.render.theme, ""),
-            "footer": "数据来源 VNDB · TouchGal · AnimeTrace",
+            "footer": "数据来源 Bangumi · VNDB · TouchGal · AnimeTrace",
             "stamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "show_footer": self._settings.render.show_footer,
         }
@@ -227,10 +227,20 @@ class Renderer:
     # -- 纯文本兜底 -------------------------------------------------------- #
 
     @staticmethod
+    def _rating_lines(data: Mapping[str, Any], existing: list[str]) -> list[str]:
+        return [
+            f"{rating.get('source', '')} 评分：{rating.get('score', '')}{rating.get('scale', '')} · {rating.get('meta', '')}"
+            for rating in data.get("ratings") or []
+            if isinstance(rating, Mapping)
+            and not any(f"{rating.get('source', '')} 评分：" in line for line in existing)
+        ]
+
+    @staticmethod
     def _card_text(card: Mapping[str, Any]) -> str:
         headline = " ".join(str(card[key]) for key in ("badge", "subtitle") if card.get(key))
         lines = [headline] if headline else []
         lines.extend(str(item) for item in card.get("desc") or [])
+        lines.extend(Renderer._rating_lines(card, lines))
         return "\n".join(lines)
 
     def plain_text(self, data: Mapping[str, Any]) -> str:
@@ -251,6 +261,9 @@ class Renderer:
 
         if data.get("info"):
             blocks.append("\n".join(str(item) for item in data["info"]))
+        ratings = self._rating_lines(data, blocks)
+        if ratings:
+            blocks.append("\n".join(ratings))
 
         for card in data.get("cards") or []:
             if isinstance(card, Mapping):

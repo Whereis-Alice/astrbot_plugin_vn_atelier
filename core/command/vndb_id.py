@@ -20,7 +20,7 @@ from ..types import (
     SettingException,
     Tips,
 )
-from ..utils import paragraphs, parse_touchgal_details_async
+from ..utils import paragraphs, parse_touchgal_details_async, plain_markup
 from .base import BaseCommand
 
 
@@ -57,7 +57,11 @@ class VndbIdCommand(BaseCommand):
             layout, data = await self.character_view(response, title="角色档案", subtitle=raw)
         else:
             results: Sequence = response
-            desc, previews = await self._touchgal_extra(raw)
+            match = await self.runtime.bangumi.match_vn(results[0])
+            if match.subject and match.subject.summary:
+                desc, previews = paragraphs(plain_markup(match.subject.summary))[:12], []
+            else:
+                desc, previews = await self._touchgal_extra(raw)
             layout, data = await self.vn_view(
                 results, desc=desc, previews=previews, title="作品档案", subtitle=raw
             )

@@ -1,7 +1,7 @@
 """LLM 函数工具。
 
-把工房的三个核心检索能力暴露给大模型，用户不必记住指令格式，直接说
-「帮我查一下 Clannad 的评分」也能拿到 VNDB 数据。返回值刻意是纯文本
+把工房的四个核心检索能力暴露给大模型，用户不必记住指令格式，直接说
+「帮我查一下 Clannad 的评分」也能拿到 Bangumi 优先的数据。返回值刻意是纯文本
 而不是图片：函数调用的结果要进模型上下文，文本才有意义。
 
 默认关闭（配置项 limit.enableLlmTools），因为工具会占用模型的上下文
@@ -17,8 +17,10 @@ from astrbot.core.agent.run_context import ContextWrapper
 from astrbot.core.agent.tool import ToolExecResult
 from pydantic.dataclasses import dataclass
 
+from ..service.bangumi import subject_id
 from ..types import CommandType, Tips
 from ..utils import character_lines, clip, producer_lines, vn_lines
+from ..utils.bangumi import bangumi_lines, match_lines
 
 _LOG = "[Gal工房]"
 
@@ -75,13 +77,53 @@ class SearchVnTool(_AtelierTool):
         if not keyword:
             return "缺少参数 keyword。"
         try:
+            if self.runtime.settings.bangumi.enabled:
+                try:
+                    subjects = await self.runtime.bangumi.search(keyword, limit=_MAX_ITEMS)
+                except Tips:
+                    subjects = []
+                if subjects:
+                    return _wrap(
+                        CommandType.BANGUMI,
+                        [
+                            _block(f"《{item.display_title}》", bangumi_lines(item, compact=True))
+                            for item in subjects
+                        ],
+                    )
             results = await self.runtime.vndb.request_by_vn(keyword)
         except Tips as error:
             return f"查询失败：{error.message}"
-        blocks = [
-            _block(f"《{item.display_title}》", vn_lines(item)) for item in results[:_MAX_ITEMS]
-        ]
+        blocks = []
+        for item in results[:_MAX_ITEMS]:
+            match = await self.runtime.bangumi.match_vn(item)
+            blocks.append(
+                _block(f"《{item.display_title}》", [*match_lines(match), *vn_lines(item)])
+            )
         return _wrap(CommandType.VN, blocks)
+
+
+@dataclass
+class SearchBangumiTool(_AtelierTool):
+    async def call(self, context: ContextWrapper, **kwargs: Any) -> ToolExecResult:
+        keyword = self._keyword(kwargs)
+        if not keyword:
+            return "缺少参数 keyword。"
+        try:
+            identifier = subject_id(keyword)
+            if identifier:
+                item = await self.runtime.bangumi.subject(identifier)
+                items = [item] if item else []
+            else:
+                items = await self.runtime.bangumi.search(keyword, limit=_MAX_ITEMS)
+            return _wrap(
+                CommandType.BANGUMI,
+                [
+                    _block(f"《{item.display_title}》", bangumi_lines(item))
+                    for item in items[:_MAX_ITEMS]
+                ],
+            )
+        except Tips as error:
+            return f"查询失败：{error.message}"
 
 
 @dataclass
@@ -130,17 +172,18 @@ TOOL_NAMES: tuple[str, ...] = (
     "vn_atelier_search_vn",
     "vn_atelier_search_character",
     "vn_atelier_search_producer",
+    "vn_atelier_search_bangumi",
 )
 
 
 def build_tools(runtime: Any) -> list[FunctionTool]:
-    """构造三个工具实例并注入运行时依赖。"""
+    """构造四个工具实例并注入运行时依赖。"""
     specs = (
         (
             SearchVnTool,
             TOOL_NAMES[0],
             (
-                "在 VNDB 上按名称检索视觉小说（galgame）作品，返回评分、发售日、"
+                "优先在 Bangumi 检索游戏，失败或无结果时回退 VNDB，返回注明来源与量纲的评分、发售日、"
                 "制作方、游玩时长与多语言标题。需要作品客观资料时使用。"
             ),
         ),
@@ -156,6 +199,11 @@ def build_tools(runtime: Any) -> list[FunctionTool]:
             SearchProducerTool,
             TOOL_NAMES[2],
             "在 VNDB 上按名称检索视觉小说厂商 / 社团，返回类型、文本语言与代表作列表。",
+        ),
+        (
+            SearchBangumiTool,
+            TOOL_NAMES[3],
+            "读取 Bangumi 游戏的评分（10分制）、评价人数、游戏排名、发售日和制作数据。keyword 可为名称、条目ID或 bgm.tv 条目链接。不能用动漫条目的评分代替游戏评分。",
         ),
     )
     tools: list[FunctionTool] = []

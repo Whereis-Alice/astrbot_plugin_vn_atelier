@@ -8,6 +8,7 @@ main.py 只负责把 AstrBot 的指令装饰器映射到这里的处理器类，
 from __future__ import annotations
 
 from .admin import CacheCommand, PushCommand, ThemeCommand
+from .bangumi import BangumiCommand, BangumiRankingCommand
 from .base import (
     BaseCommand,
     Composer,
@@ -35,6 +36,8 @@ from .vn import VnCommand
 from .vndb_id import VndbIdCommand
 
 __all__ = [
+    "BangumiCommand",
+    "BangumiRankingCommand",
     "BaseCommand",
     "CacheCommand",
     "CharacterCommand",
