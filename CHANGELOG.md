@@ -2,6 +2,13 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v4.0.1] - 2026-10-11
+
+### 修复
+
+- 修复开启 NSFW 并填写 Bangumi 令牌时，搜索与排行接口返回 `HTTP 400`（`filter.nsfw` 需为布尔值，旧版误传字符串 `"include"`）导致 Bangumi 功能整体不可用的问题。
+- 未开启 NSFW 时改由接口侧直接过滤成人条目（`filter.nsfw=false`），避免成人条目占用检索与评分榜名额。
+
 ## [v4.0.0] - 2026-10-10
 
 ### Bangumi 优先的大更新

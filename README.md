@@ -12,7 +12,7 @@
 </p>
 
 <p>
-<img alt="version" src="https://img.shields.io/badge/version-v4.0.0-6c7ee1">
+<img alt="version" src="https://img.shields.io/badge/version-v4.0.1-6c7ee1">
 <img alt="AstrBot" src="https://img.shields.io/badge/AstrBot-%E2%89%A5%204.16-4c8dff">
 <img alt="Python" src="https://img.shields.io/badge/Python-3.10%2B-3776ab">
 <img alt="License" src="https://img.shields.io/badge/License-AGPL--3.0-9b6fd6">

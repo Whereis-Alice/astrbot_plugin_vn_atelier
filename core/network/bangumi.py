@@ -13,7 +13,7 @@ from ..types import Tips
 from ..types.bangumi import BangumiSubject
 
 _API = "https://api.bgm.tv/v0"
-_UA = "Whereis-Alice/GalAtelier/4.0.0 (https://github.com/Whereis-Alice/astrbot_plugin_vn_atelier)"
+_UA = "Whereis-Alice/GalAtelier/4.0.1 (https://github.com/Whereis-Alice/astrbot_plugin_vn_atelier)"
 
 
 class Bangumi:
@@ -94,8 +94,10 @@ class Bangumi:
         min_votes: int = 0,
     ) -> list[BangumiSubject]:
         filters: dict[str, Any] = {"type": [4]}
-        if self._settings.safety.enable_nsfw and self._settings.bangumi.token:
-            filters["nsfw"] = "include"
+        # Bangumi 的 filter.nsfw 必须是布尔值；默认排除成人条目，
+        # 仅在开启 NSFW 且填写账号令牌时省略该过滤以纳入成人条目。
+        if not (self._settings.safety.enable_nsfw and self._settings.bangumi.token):
+            filters["nsfw"] = False
         if year:
             filters["air_date"] = [f">={year}-01-01", f"<{year + 1}-01-01"]
         if tag:

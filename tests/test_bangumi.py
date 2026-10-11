@@ -419,12 +419,13 @@ class NetworkTests(unittest.IsolatedAsyncioTestCase):
             request["body"]["filter"],
             {
                 "type": [4],
+                "nsfw": False,
                 "air_date": [">=2024-01-01", "<2025-01-01"],
                 "tag": ["galgame"],
                 "rating_count": [">=100"],
             },
         )
-        self.assertIn("GalAtelier/4.0.0", request["headers"]["User-Agent"])
+        self.assertIn("GalAtelier/4.0.1", request["headers"]["User-Agent"])
         self.assertNotIn("Authorization", request["headers"])
 
     async def test_token_nsfw_and_game_type(self):
@@ -432,7 +433,7 @@ class NetworkTests(unittest.IsolatedAsyncioTestCase):
         self.settings.safety.enable_nsfw = True
         self.response = {"data": [subject(nsfw=True).model_dump()]}
         self.assertEqual(len(await self.client.search("星空")), 1)
-        self.assertEqual(self.requests[0]["body"]["filter"]["nsfw"], "include")
+        self.assertNotIn("nsfw", self.requests[0]["body"]["filter"])
         self.assertEqual(
             self.requests[0]["headers"]["Authorization"], "Bearer unit-test-token-not-a-secret"
         )

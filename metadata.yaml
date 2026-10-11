@@ -2,7 +2,7 @@ name: astrbot_plugin_vn_atelier
 display_name: Gal工房
 desc: Bangumi 优先的 Galgame 资料助手。查询游戏评分、评价人数、排名与制作信息，为每日推送及作品卡片关联 Bangumi / VNDB 双来源评分；支持角色会社检索、评分榜、随机推荐、识图出处与收藏，提供四套图片主题。
 short_desc: Bangumi 优先：游戏评分与资料、双来源推送卡片、排行与角色检索
-version: v4.0.0
+version: v4.0.1
 author: Whereis-Alice
 repo: https://github.com/Whereis-Alice/astrbot_plugin_vn_atelier
 astrbot_version: ">=4.16,<5"
