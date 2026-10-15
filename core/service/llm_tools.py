@@ -4,7 +4,7 @@
 「帮我查一下 Clannad 的评分」也能拿到 Bangumi 优先的数据。返回值刻意是纯文本
 而不是图片：函数调用的结果要进模型上下文，文本才有意义。
 
-默认关闭（配置项 limit.enableLlmTools），因为工具会占用模型的上下文
+默认关闭（配置项 limitSetting.enableLlmTools），因为工具会占用模型的上下文
 预算，并不是所有部署都需要。
 """
 
