@@ -7,6 +7,7 @@ import json
 import sys
 import types
 import unittest
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -31,6 +32,7 @@ Character = module("types").VndbCharacterResponse
 Layout = module("types").Layout
 Theme = module("types").Theme
 Tips = module("types").Tips
+ResponseException = module("types").ResponseException
 Renderer = module("service.renderer").Renderer
 BangumiSubject = module("types.bangumi").BangumiSubject
 BangumiCharacter = module("types.bangumi").BangumiCharacter
@@ -40,6 +42,10 @@ CalendarComposer = module("command.calendar").CalendarComposer
 DailyDigest = module("command.daily").DailyDigest
 DATE = ["2026", "10", "19"]
 IMAGE = "data:image/png;base64,eA=="
+
+
+def log_messages(logger, level="info"):
+    return "\n".join(call.args[0] % call.args[1:] for call in getattr(logger, level).call_args_list)
 
 
 def vn(identifier="v1", **changes):
@@ -140,6 +146,38 @@ class SettingsTests(unittest.TestCase):
             (1, 50, 12),
         )
 
+    def test_diagnostic_summary_reports_loaded_values_without_private_targets(self):
+        schedule = Settings.from_config({}).schedule
+        schedule.featured = False
+        schedule.calendar = True
+        schedule.new_releases = True
+        schedule.anniversary_count = 8
+        schedule.birthday_count = 9
+        schedule.new_release_count = 17
+        schedule.push_list = (("private-platform", "private-group"),)
+        self.assertEqual(
+            schedule.diagnostic_summary,
+            "每日精选=关闭，今日清单=开启，今日新作=开启；数量上限：纪念日作品=8，生日角色=9，今日新作=17",
+        )
+
+
+class StartupDiagnosticsTests(unittest.IsolatedAsyncioTestCase):
+    async def test_loaded_schedule_is_logged_before_network_initialization(self):
+        entry = module("runtime")
+        app = object.__new__(entry.AtelierRuntime)
+        app.settings = Settings.from_config(
+            {"scheduleSetting": {"pushTime": "07:30", "enableNewReleases": True}}
+        )
+        app.http = types.SimpleNamespace(initialize=AsyncMock())
+        app.downloader = types.SimpleNamespace(initialize=AsyncMock())
+        app.cache = types.SimpleNamespace(initialize=AsyncMock())
+        with patch.object(entry, "logger") as logger:
+            await app.initialize()
+        messages = log_messages(logger)
+        self.assertIn("每日推送配置已加载：时间=07:30", messages)
+        self.assertIn("今日新作=开启", messages)
+        app.http.initialize.assert_awaited_once()
+
 
 class QueryTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
@@ -181,13 +219,32 @@ class QueryTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("rating", json.dumps(payload["filters"]))
 
     async def test_new_releases_are_exact_vn_date_no_scores(self):
-        await self.client.request_new_releases(DATE, limit=17)
+        self.assertEqual(await self.client.request_new_releases(DATE, limit=17), [])
         self.assertTrue(self.http.post.await_args.args[0].endswith("/vn"))
         payload = self.payload()
         self.assertEqual(payload["filters"], ["released", "=", "2026-10-19"])
         self.assertEqual(payload["results"], 17)
         self.assertIn("description", payload["fields"])
         self.assertNotIn("rating", json.dumps(payload["filters"]))
+
+    async def test_malformed_response_is_not_treated_as_legitimate_empty_list(self):
+        for response in (
+            None,
+            [],
+            {},
+            {"count": 0},
+            {"results": None},
+            {"results": {}},
+            {"results": "invalid"},
+            {"results": [None]},
+            {"results": ["invalid"]},
+            {"results": [1]},
+            {"results": [vn().model_dump(), None]},
+        ):
+            with self.subTest(response=response):
+                self.http.post.return_value = response
+                with self.assertRaises(ResponseException):
+                    await self.client.request_new_releases(DATE)
 
     async def test_same_work_siblings_ignore_initial_role_and_gender_and_page(self):
         self.settings.schedule.gender_filter = "a"
@@ -338,7 +395,9 @@ class CompositionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(await self.composer.calendar_data(DATE, "测试"))
 
     async def test_new_release_prefers_bgm_intro_without_replacing_source_date(self):
-        data = await self.composer.new_release_data(DATE, "测试")
+        with patch.object(module("command.calendar"), "logger") as logger:
+            data = await self.composer.new_release_data(DATE, "测试")
+        self.assertIn("VNDB 首发日期=2026-10-19 返回 1 部", log_messages(logger))
         item = data["sections"][0]["cards"][0]
         self.assertEqual(item["subtitle"], "星之路")
         self.assertIn("中文作品简介。", item["desc"])
@@ -358,7 +417,24 @@ class CompositionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_new_empty_results_do_not_generate_image(self):
         self.runtime.vndb.request_new_releases.return_value = []
-        self.assertIsNone(await self.composer.new_release_data(DATE, "测试"))
+        with patch.object(module("command.calendar"), "logger") as logger:
+            self.assertIsNone(await self.composer.new_release_data(DATE, "测试"))
+        messages = log_messages(logger)
+        self.assertIn("VNDB 首发日期=2026-10-19，展示上限=12", messages)
+        self.assertIn("返回 0 部，跳过新作卡片", messages)
+        self.assertIn("不代表当天一定没有新作", messages)
+        self.runtime.bangumi.match_vn.assert_not_awaited()
+        self.runtime.assets.fetch.assert_not_awaited()
+
+    async def test_failed_query_is_not_reported_as_zero_results(self):
+        self.runtime.vndb.request_new_releases.side_effect = Tips("接口不可用")
+        with (
+            patch.object(module("command.calendar"), "logger") as logger,
+            self.assertRaises(Tips),
+        ):
+            await self.composer.new_release_data(DATE, "测试")
+        self.assertNotIn("返回 0 部", log_messages(logger))
+        self.runtime.bangumi.match_vn.assert_not_awaited()
 
     async def test_templates_four_themes_keep_all_rows_and_escape_input(self):
         self.runtime.vndb.request_birthdays.return_value = [
@@ -397,7 +473,9 @@ class DigestTests(unittest.IsolatedAsyncioTestCase):
             "_build_new_releases",
         ):
             setattr(self.daily, name, AsyncMock(return_value=name))
-        self.assertEqual(await self.daily.build(), ["_build_event_vn", "_build_event_cha"])
+        with patch.object(module("command.daily"), "logger") as logger:
+            self.assertEqual(await self.daily.build(), ["_build_event_vn", "_build_event_cha"])
+        self.assertIn("今日新作=关闭", log_messages(logger))
         self.daily._build_calendar.assert_not_awaited()
         self.daily._build_new_releases.assert_not_awaited()
 
@@ -408,9 +486,45 @@ class DigestTests(unittest.IsolatedAsyncioTestCase):
         self.daily._build_event_cha = AsyncMock(return_value="birthday-feature")
         self.daily._build_calendar = AsyncMock(return_value="calendar-image")
         self.daily._build_new_releases = AsyncMock(return_value="new-image")
-        self.assertEqual(
-            await self.daily.build(), ["birthday-feature", "calendar-image", "new-image"]
-        )
+        with patch.object(module("command.daily"), "logger") as logger:
+            self.assertEqual(
+                await self.daily.build(), ["birthday-feature", "calendar-image", "new-image"]
+            )
+        warnings = log_messages(logger, "warning")
+        self.assertIn("精选纪念日作品", warnings)
+        self.assertIn("[Tips]：精选失败", warnings)
+        self.assertIn("第 3 张图片已生成：今日新作", log_messages(logger))
+        self.assertIn("尚未发送", log_messages(logger))
+        self.assertIn("共 3 张独立图片", log_messages(logger))
+
+    async def test_no_new_releases_logs_date_and_skip_without_rendering(self):
+        self.runtime.settings.schedule.featured = False
+        self.runtime.settings.schedule.new_releases = True
+        self.runtime.vndb.request_new_releases.return_value = []
+        self.daily.render = AsyncMock()
+        entry = module("command.daily")
+        with patch.object(entry, "logger") as logger, patch.object(entry, "datetime") as clock:
+            clock.now.return_value = datetime(2026, 10, 19, 7, 0)
+            self.assertEqual(await self.daily.build(), [])
+        messages = log_messages(logger)
+        self.assertIn("查询日期=2026-10-19", messages)
+        self.assertIn("服务器时间=2026-10-19T07:00:00", messages)
+        self.assertIn("今日新作=开启", messages)
+        self.assertIn("今日新作，2026-10-19）未生成图片，跳过发送", messages)
+        self.assertIn("共 0 张独立图片", messages)
+        self.runtime.vndb.request_new_releases.assert_awaited_once_with(DATE, limit=12)
+        self.daily.render.assert_not_awaited()
+
+    async def test_new_release_query_failure_keeps_other_images_and_logs_reason(self):
+        self.runtime.settings.schedule.new_releases = True
+        self.daily._build_event_vn = AsyncMock(return_value="featured-image")
+        self.daily._build_event_cha = AsyncMock(return_value="birthday-image")
+        self.runtime.vndb.request_new_releases.side_effect = Tips("VNDB 暂时不可用")
+        with patch.object(module("command.daily"), "logger") as logger:
+            self.assertEqual(await self.daily.build(), ["featured-image", "birthday-image"])
+        warnings = log_messages(logger, "warning")
+        self.assertIn("构建每日推送（今日新作", warnings)
+        self.assertIn("[Tips]：VNDB 暂时不可用", warnings)
 
     async def test_featured_off_no_featured_queries(self):
         self.runtime.settings.schedule.featured = False
@@ -491,9 +605,39 @@ class DigestTests(unittest.IsolatedAsyncioTestCase):
         digest = types.SimpleNamespace(
             build=AsyncMock(return_value=[f"https://example.invalid/{i}.jpg" for i in range(4)])
         )
-        with patch.object(entry, "DailyDigest", return_value=digest):
+        with (
+            patch.object(entry, "DailyDigest", return_value=digest),
+            patch.object(entry, "logger") as logger,
+        ):
             await plugin._push_today()
         self.assertEqual(plugin.context.send_message.await_count, 4)
+        warnings = log_messages(logger, "warning")
+        self.assertIn("第 1/4 张图片", warnings)
+        self.assertIn("第 2/4 张图片", warnings)
+        self.assertIn("单图发送失败", warnings)
+
+    async def test_no_targets_logs_skip_without_querying(self):
+        entry = importlib.import_module(PKG + ".main")
+        plugin = object.__new__(entry.VnAtelierPlugin)
+        plugin.runtime = self.runtime
+        self.runtime.subscription = types.SimpleNamespace(targets=AsyncMock(return_value=[]))
+        with (
+            patch.object(entry, "DailyDigest") as digest,
+            patch.object(entry, "logger") as logger,
+        ):
+            await plugin._push_today()
+        digest.assert_not_called()
+        self.assertIn("没有推送目标", log_messages(logger))
+        self.assertIn("未查询内容", log_messages(logger))
+
+    async def test_missing_cron_manager_reports_scheduled_push_unavailable(self):
+        entry = importlib.import_module(PKG + ".main")
+        plugin = object.__new__(entry.VnAtelierPlugin)
+        plugin.runtime = self.runtime
+        plugin.context = types.SimpleNamespace()
+        with patch.object(entry, "logger") as logger:
+            await plugin._register_job()
+        self.assertIn("定时任务模块不可用，未注册每日推送", log_messages(logger, "warning"))
 
     async def test_manual_calendar_does_not_apply_scheduled_exclusions(self):
         cmd = module("command.event").EventCommand(self.runtime, object())

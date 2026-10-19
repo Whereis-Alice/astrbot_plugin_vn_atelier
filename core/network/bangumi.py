@@ -13,7 +13,7 @@ from ..types import Tips
 from ..types.bangumi import BangumiCharacter, BangumiSubject
 
 _API = "https://api.bgm.tv/v0"
-_UA = "Whereis-Alice/GalAtelier/4.1.0 (https://github.com/Whereis-Alice/astrbot_plugin_vn_atelier)"
+_UA = "Whereis-Alice/GalAtelier/4.1.1 (https://github.com/Whereis-Alice/astrbot_plugin_vn_atelier)"
 
 
 class Bangumi:

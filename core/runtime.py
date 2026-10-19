@@ -66,6 +66,12 @@ class AtelierRuntime:
     async def initialize(self) -> None:
         """建立网络会话与缓存目录。"""
         self.settings.log_warnings()
+        logger.info(
+            "%s 每日推送配置已加载：时间=%s（服务器本地时区）；%s",
+            _LOG,
+            self.settings.schedule.push_time,
+            self.settings.schedule.diagnostic_summary,
+        )
         await self.http.initialize()
         await self.downloader.initialize()
         await self.cache.initialize()

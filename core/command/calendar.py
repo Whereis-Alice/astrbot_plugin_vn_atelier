@@ -210,11 +210,25 @@ class CalendarComposer(Composer):
         )
 
     async def new_release_data(self, date: Sequence[str], stamp: str) -> dict[str, Any] | None:
+        logger.info(
+            "[Gal工房] 今日新作查询：VNDB 首发日期=%s，展示上限=%s（不设评分门槛）",
+            "-".join(date),
+            self.settings.schedule.new_release_count,
+        )
         works = await self.runtime.vndb.request_new_releases(
             date, limit=self.settings.schedule.new_release_count
         )
         if not works:
+            logger.info(
+                "[Gal工房] 今日新作：VNDB 首发日期=%s 返回 0 部，跳过新作卡片；不是报错，不代表当天一定没有新作",
+                "-".join(date),
+            )
             return None
+        logger.info(
+            "[Gal工房] 今日新作：VNDB 首发日期=%s 返回 %s 部，开始补充资料并组卡",
+            "-".join(date),
+            len(works),
+        )
         cards = await self.daily_work_cards(works, year=int(date[0]), new=True)
         block = section(
             text=(

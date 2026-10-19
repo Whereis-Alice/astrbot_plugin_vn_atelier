@@ -56,7 +56,11 @@ class Vndb:
     async def _post(self, endpoint: str, payload: dict[str, Any]) -> dict[str, Any]:
         url = f"{_KANA}{endpoint}"
         response = await self._http.post(url, payload, res_type="json")
-        if not isinstance(response, dict):
+        if (
+            not isinstance(response, dict)
+            or not isinstance(response.get("results"), list)
+            or any(not isinstance(item, dict) for item in response["results"])
+        ):
             raise ResponseException(url)
         return response
 

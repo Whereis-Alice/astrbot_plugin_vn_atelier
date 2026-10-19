@@ -123,7 +123,10 @@ class VnAtelierPlugin(Star):
         """
         runtime = self.runtime
         manager = self._cron
-        if runtime is None or manager is None:
+        if runtime is None:
+            return
+        if manager is None:
+            logger.warning("%s 定时任务模块不可用，未注册每日推送；手动查询仍可使用", _LOG)
             return
 
         try:
@@ -162,7 +165,7 @@ class VnAtelierPlugin(Star):
 
         targets = await runtime.subscription.targets()
         if not targets:
-            logger.debug("%s 没有推送目标，跳过本次简讯", _LOG)
+            logger.info("%s 没有推送目标，跳过本次每日推送（未查询内容）", _LOG)
             return
 
         try:
@@ -175,15 +178,29 @@ class VnAtelierPlugin(Star):
             return
 
         sent = 0
+        logger.info("%s 开始分发每日推送：%s 张独立图片，目标 %s 个", _LOG, len(urls), len(targets))
         for target in targets:
-            for url in urls:
+            for index, url in enumerate(urls, start=1):
                 try:
                     ok = await self.context.send_message(target, MessageChain().url_image(url))
                 except Exception as error:
-                    logger.warning("%s 推送到 %s 失败：%s", _LOG, target, error)
+                    logger.warning(
+                        "%s 第 %s/%s 张图片推送到 %s 失败：%s",
+                        _LOG,
+                        index,
+                        len(urls),
+                        target,
+                        error,
+                    )
                     continue
                 if not ok:
-                    logger.warning("%s 推送到 %s 未送达，可能会话已失效", _LOG, target)
+                    logger.warning(
+                        "%s 第 %s/%s 张图片推送到 %s 未送达，可能会话已失效",
+                        _LOG,
+                        index,
+                        len(urls),
+                        target,
+                    )
                     continue
                 sent += 1
         logger.info("%s 每日简讯已推送 %s 条（目标 %s 个）", _LOG, sent, len(targets))

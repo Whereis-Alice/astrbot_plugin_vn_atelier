@@ -304,6 +304,22 @@ class ScheduleSettings:
     """白名单，元素为 (平台id, 群聊id)。"""
 
     @property
+    def diagnostic_summary(self) -> str:
+        """仅包含已加载的栏目开关与数量，不含会话或凭证。"""
+        columns = "，".join(
+            f"{label}={'开启' if enabled else '关闭'}"
+            for label, enabled in (
+                ("每日精选", self.featured),
+                ("今日清单", self.calendar),
+                ("今日新作", self.new_releases),
+            )
+        )
+        return (
+            f"{columns}；数量上限：纪念日作品={self.anniversary_count}，"
+            f"生日角色={self.birthday_count}，今日新作={self.new_release_count}"
+        )
+
+    @property
     def cron_expression(self) -> str:
         """标准 5 段 cron 表达式：分 时 日 月 周。"""
         return f"{self.minute} {self.hour} * * *"

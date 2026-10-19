@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime
+from time import monotonic
 
 from astrbot.api import logger
 
@@ -42,6 +43,13 @@ class DailyDigest(CalendarComposer):
         urls: list[str] = []
         self._birthday_ids: set[str] = set()
         schedule = self.settings.schedule
+        logger.info(
+            "%s 每日推送开始：查询日期=%s，服务器时间=%s；%s",
+            _LOG,
+            "-".join(date),
+            now.astimezone().isoformat(timespec="seconds"),
+            schedule.diagnostic_summary,
+        )
         builders = []
         if schedule.featured:
             builders.extend(
@@ -52,13 +60,33 @@ class DailyDigest(CalendarComposer):
         if schedule.new_releases:
             builders.append(("今日新作", self._build_new_releases))
         for name, builder in builders:
+            started = monotonic()
+            logger.info("%s 开始构建每日推送：%s（%s）", _LOG, name, "-".join(date))
             try:
                 url = await builder(date, stamp)
             except Exception as error:
-                logger.warning("%s 构建每日推送（%s）失败：%s", _LOG, name, brief(error))
+                logger.warning(
+                    "%s 构建每日推送（%s，%s）失败 [%s]：%s（耗时 %.1f 秒）",
+                    _LOG,
+                    name,
+                    "-".join(date),
+                    type(error).__name__,
+                    brief(error),
+                    monotonic() - started,
+                )
                 continue
             if url:
                 urls.append(url)
+                logger.info(
+                    "%s 每日推送第 %s 张图片已生成：%s（耗时 %.1f 秒，尚未发送）",
+                    _LOG,
+                    len(urls),
+                    name,
+                    monotonic() - started,
+                )
+            else:
+                logger.info("%s 每日推送（%s，%s）未生成图片，跳过发送", _LOG, name, "-".join(date))
+        logger.info("%s 每日推送构建完成：%s，共 %s 张独立图片", _LOG, "-".join(date), len(urls))
         return urls
 
     # -- 简介 -------------------------------------------------------------- #
