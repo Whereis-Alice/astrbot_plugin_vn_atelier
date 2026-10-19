@@ -30,6 +30,7 @@ class CommandType(str, Enum):
     HELP = "help"
     BANGUMI = "bangumi"
     BANGUMI_RANKING = "bangumi_ranking"
+    NEW_RELEASES = "new_releases"
 
     def __str__(self) -> str:
         return self.value
@@ -101,6 +102,7 @@ LAYOUT_OF_COMMAND: Final[dict[CommandType, Layout]] = {
     CommandType.DOWNLOAD: Layout.PANEL,
     CommandType.BANGUMI: Layout.FEATURE,
     CommandType.BANGUMI_RANKING: Layout.GALLERY,
+    CommandType.NEW_RELEASES: Layout.DOSSIER,
 }
 """指令到默认布局的映射。ID 指令在拿到简介后会临时切换到 FEATURE。"""
 
@@ -108,16 +110,16 @@ VNDB_FIELDS: Final[dict[str, str]] = {
     "vn": (
         "id,average,rating,votecount,extlinks.url,released,length_minutes,platforms,aliases,description,"
         "developers{id,original,name},titles{lang,title,official},"
-        "image{url},alttitle,title"
+        "image{url,sexual},alttitle,title"
     ),
     "character": (
         "id,name,aliases,sex,birthday,waist,hips,bust,blood_type,weight,"
-        "height,cup,original,image{url},vns{id,alttitle,title}"
+        "height,cup,original,image{url,sexual},vns{id,alttitle,title}"
     ),
     "producer": "id,name,original,aliases,lang,type",
-    "vn_short": "id,alttitle,title,released,rating,votecount,extlinks.url,image{url}",
-    "character_short": "id,name,original,aliases,image{url},vns{id,alttitle,title}",
-    "character_event": "id,name,aliases,birthday,original,image{url}",
+    "vn_short": "id,alttitle,title,released,rating,votecount,extlinks.url,image{url,sexual}",
+    "character_short": "id,name,original,aliases,image{url,sexual},vns{id,alttitle,title}",
+    "character_event": "id,name,aliases,sex,birthday,original,image{url,sexual},vns{id,alttitle,title,released}",
 }
 """VNDB Kana API 的 fields 参数。字段列表直接决定响应模型可用的属性。"""
 

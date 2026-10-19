@@ -8,6 +8,16 @@
 
 <img src="preview/bangumi_daily.jpg" alt="每日发售纪念卡：Bangumi 与 VNDB 分开显示各自评分">
 
+## 独立推送栏目
+
+精选、清单、新作分别发图，不拼成一张精选卡。开启方式与来源见[每日推送说明](daily-push.md)。
+
+<img src="preview/daily_same_work_birthdays.jpg" alt="精选生日：同一作品两位寿星一起展示，附作品评分">
+
+<img src="preview/daily_calendar.jpg" alt="独立今日清单：12 部纪念日作品与 12 位生日角色，人物栏只有角色信息和来源作品">
+
+<img src="preview/daily_new_releases.jpg" alt="独立今日新作：作品详情、Bangumi 评分与无法可靠匹配时的无评分回退">
+
 ## 版式与配色
 
 <table>

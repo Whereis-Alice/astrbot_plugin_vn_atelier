@@ -272,7 +272,7 @@ class FindSettings:
 @dataclass(slots=True)
 class EventSettings:
     rating: int = 75
-    """简讯过滤阈值，低于此贝叶斯评分的作品不参与。"""
+    """精选生日候选的关联作品贝叶斯评分门槛，清单和新作不使用。"""
 
     start_year: int = 1990
     """回溯的起始年份。"""
@@ -294,6 +294,12 @@ class ScheduleSettings:
     content: str = "c"
     gender_filter: str = "c"
     use_subscription: bool = True
+    featured: bool = True
+    calendar: bool = False
+    anniversary_count: int = 12
+    birthday_count: int = 12
+    new_releases: bool = False
+    new_release_count: int = 12
     push_list: tuple[tuple[str, str], ...] = ()
     """白名单，元素为 (平台id, 群聊id)。"""
 
@@ -484,6 +490,12 @@ class Settings:
             content=_option_key(schedule_raw.get("scheduleContent"), ["a", "b", "c"], "c"),
             gender_filter=_option_key(schedule_raw.get("genderFilter"), ["a", "b", "c"], "c"),
             use_subscription=_as_bool(schedule_raw.get("useSubscription"), True),
+            featured=_as_bool(schedule_raw.get("enableFeatured"), True),
+            calendar=_as_bool(schedule_raw.get("enableCalendar"), False),
+            anniversary_count=_as_int(schedule_raw.get("anniversaryCount"), 12, 1, 50),
+            birthday_count=_as_int(schedule_raw.get("birthdayCount"), 12, 1, 50),
+            new_releases=_as_bool(schedule_raw.get("enableNewReleases"), False),
+            new_release_count=_as_int(schedule_raw.get("newReleaseCount"), 12, 1, 50),
             push_list=push_list,
         )
 

@@ -10,10 +10,10 @@ import aiohttp
 
 from ..settings import Settings
 from ..types import Tips
-from ..types.bangumi import BangumiSubject
+from ..types.bangumi import BangumiCharacter, BangumiSubject
 
 _API = "https://api.bgm.tv/v0"
-_UA = "Whereis-Alice/GalAtelier/4.0.1 (https://github.com/Whereis-Alice/astrbot_plugin_vn_atelier)"
+_UA = "Whereis-Alice/GalAtelier/4.1.0 (https://github.com/Whereis-Alice/astrbot_plugin_vn_atelier)"
 
 
 class Bangumi:
@@ -82,6 +82,32 @@ class Bangumi:
         except ValueError as error:
             raise Tips("Bangumi 返回了无法解析的条目数据。") from error
         return subject if self._visible(subject) else None
+
+    async def subject_characters(self, subject_id: int) -> list[BangumiCharacter]:
+        raw = await self._request(f"/subjects/{int(subject_id)}/characters")
+        if raw is None:
+            return []
+        if not isinstance(raw, list):
+            raise Tips("Bangumi 返回了无法解析的角色列表。")
+        items = []
+        for entry in raw:
+            try:
+                item = BangumiCharacter.model_validate(entry)
+            except (ValueError, TypeError):
+                continue
+            if item.type == 1:
+                items.append(item)
+        return items
+
+    async def character(self, character_id: int) -> BangumiCharacter | None:
+        raw = await self._request(f"/characters/{int(character_id)}")
+        if raw is None:
+            return None
+        try:
+            item = BangumiCharacter.model_validate(raw)
+        except (ValueError, TypeError) as error:
+            raise Tips("Bangumi 返回了无法解析的角色资料。") from error
+        return item if item.type == 1 else None
 
     async def search(
         self,

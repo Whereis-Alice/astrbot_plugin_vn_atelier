@@ -311,12 +311,12 @@
     }
   },
   "eventSetting": {
-    "description": "简讯设置",
+    "description": "精选选题设置",
     "type": "object",
     "items": {
       "eventRating": {
-        "description": "作品质量门槛",
-        "hint": "历史上的今天只统计贝叶斯评分不低于此值的作品及其登场角色。调低会让内容变多但质量参差。",
+        "description": "精选生日关联作品评分门槛",
+        "hint": "只影响精选生日候选的关联作品 VNDB 贝叶斯评分（100 分制）。今日清单和今日新作不设此门槛。",
         "type": "int",
         "slider": {
           "min": 0,
@@ -327,7 +327,7 @@
       },
       "eventStartYear": {
         "description": "回溯起始年份",
-        "hint": "只统计该年份之后发售的作品。想翻更早的老作品可以往前调。",
+        "hint": "纪念日回溯的起始年份，含此年份，不含当前年；今日首发放在新作栏目。",
         "type": "int",
         "slider": {
           "min": 1970,
@@ -340,9 +340,60 @@
   },
   "scheduleSetting": {
     "description": "每日推送",
-    "hint": "每天定时推送「历史上的今天」发售的作品与今日生日角色。也可以在群里用「工房 推送 开启」自助订阅。",
+    "hint": "精选、今日清单、今日新作是三个独立栏目，分别发图，不拼在一张精选卡上。共用推送时间和订阅会话。",
     "type": "object",
     "items": {
+      "enableFeatured": {
+        "description": "推送每日精选",
+        "hint": "保留精选纪念日作品与生日卡，分别发图。同一精选作品有多位角色同日生日时全部一起展示。",
+        "type": "bool",
+        "default": true
+      },
+      "enableCalendar": {
+        "description": "推送今日清单（独立图片）",
+        "hint": "另发一张纪念日与生日清单，不合并进精选。默认不启用；已成功生成精选生日卡的寿星不重复列出。不继承精选评分、性别或戏份筛选。",
+        "type": "bool",
+        "default": false
+      },
+      "anniversaryCount": {
+        "description": "清单作品数上限",
+        "hint": "发布纪念日作品最多展示几部，按 VNDB 评分降序取；只查往年首发，不设最低评分。不分页，也用于「工房 简讯」。",
+        "type": "int",
+        "default": 12,
+        "slider": {
+          "min": 1,
+          "max": 50,
+          "step": 1
+        }
+      },
+      "birthdayCount": {
+        "description": "清单生日角色数上限",
+        "hint": "排除已展示的精选寿星后再取人数。按 VNDB ID 排序，不分页；手动「工房 简讯」不排除寿星。",
+        "type": "int",
+        "default": 12,
+        "slider": {
+          "min": 1,
+          "max": 50,
+          "step": 1
+        }
+      },
+      "enableNewReleases": {
+        "description": "推送今日新作（独立图片）",
+        "hint": "按 VNDB 作品首次发售日期查今日视觉小说，独立发图；资料优先 Bangumi。不设评分门槛，无结果不发空图。日期可能仍是发行计划，不保证已上架或完整收录。",
+        "type": "bool",
+        "default": false
+      },
+      "newReleaseCount": {
+        "description": "今日新作数上限",
+        "hint": "独立新作长图最多展示几部，按 VNDB 评价人数降序取。也用于「工房 新作」，与纪念日作品上限分别设置。",
+        "type": "int",
+        "default": 12,
+        "slider": {
+          "min": 1,
+          "max": 50,
+          "step": 1
+        }
+      },
       "pushTime": {
         "description": "推送时间",
         "hint": "24 小时制，格式 HH:MM，例如 07:00。填错格式会自动退回 07:00 并在日志中提醒。",
@@ -362,7 +413,7 @@
       },
       "genderFilter": {
         "description": "生日角色性别筛选",
-        "hint": "推送今日生日角色时是否限制性别。",
+        "hint": "用于挑选精选生日的候选（无匹配时沿用不限性别的候选）。选定作品后，同作同日寿星全部带上；今日清单不受此项影响。",
         "type": "string",
         "options": [
           "a-只要女性角色",

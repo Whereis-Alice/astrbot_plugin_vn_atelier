@@ -8,7 +8,7 @@
 {% endif %}
 {% if sections %}
 {% for s in sections %}
-      <section class="sec">
+      <section class="sec{% if s.kind in ['anniversaries', 'birthdays', 'releases'] %} sec--{{ s.kind }}{% endif %}">
         {% if s.header %}
         <div class="sec__head">
           {% if s.header.image %}<img class="sec__img" src="{{ s.header.image | safe }}" alt="">{% endif %}

@@ -124,3 +124,52 @@ class BangumiSubject(BaseModel):
                 ):
                     return url.path.strip("/")
         return ""
+
+
+class BangumiCharacter(BaseModel):
+    """仅用于已关联游戏内的角色核对，不做全站模糊同名匹配。"""
+
+    id: int = Field(gt=0)
+    type: int = 1
+    name: str = ""
+    images: dict[str, str] = Field(default_factory=dict)
+    infobox: list[dict[str, Any]] = Field(default_factory=list)
+    birth_mon: int | None = None
+    birth_day: int | None = None
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def null_text(cls, value: Any) -> str:
+        return value if isinstance(value, str) else ""
+
+    @field_validator("images", mode="before")
+    @classmethod
+    def null_images(cls, value: Any) -> dict[str, Any]:
+        return value if isinstance(value, dict) else {}
+
+    @field_validator("infobox", mode="before")
+    @classmethod
+    def null_infobox(cls, value: Any) -> list[dict[str, Any]]:
+        return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+
+    def info(self, *keys: str) -> list[str]:
+        return [
+            text
+            for item in self.infobox
+            if item.get("key") in keys
+            for text in infobox_values(item.get("value"))
+        ]
+
+    @property
+    def names(self) -> list[str]:
+        return [self.name, *self.info("简体中文名", "别名")]
+
+    @property
+    def display_name(self) -> str:
+        return next(iter(self.info("简体中文名")), self.name)
+
+    @property
+    def cover(self) -> str:
+        return (
+            self.images.get("large") or self.images.get("medium") or self.images.get("grid") or ""
+        )

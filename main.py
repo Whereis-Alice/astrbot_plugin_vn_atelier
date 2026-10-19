@@ -34,6 +34,7 @@ from .core.command import (
     EventCommand,
     FindCommand,
     HelpCommand,
+    NewReleasesCommand,
     ProducerCommand,
     PushCommand,
     RandomCommand,
@@ -133,6 +134,9 @@ class VnAtelierPlugin(Star):
             logger.warning("%s 清理旧定时任务失败：%s", _LOG, error)
 
         schedule = runtime.settings.schedule
+        if not (schedule.featured or schedule.calendar or schedule.new_releases):
+            logger.info("%s 每日推送的全部栏目已关闭，不注册定时任务", _LOG)
+            return
         try:
             job = await manager.add_basic_job(
                 name=_JOB_NAME,
@@ -177,10 +181,10 @@ class VnAtelierPlugin(Star):
                     ok = await self.context.send_message(target, MessageChain().url_image(url))
                 except Exception as error:
                     logger.warning("%s 推送到 %s 失败：%s", _LOG, target, error)
-                    break
+                    continue
                 if not ok:
                     logger.warning("%s 推送到 %s 未送达，可能会话已失效", _LOG, target)
-                    break
+                    continue
                 sent += 1
         logger.info("%s 每日简讯已推送 %s 条（目标 %s 个）", _LOG, sent, len(targets))
 
@@ -289,6 +293,12 @@ class VnAtelierPlugin(Star):
     async def event_of_day(self, event: AstrMessageEvent, date: str = ""):
         """查当天（或指定「月-日」）的发售纪念日与角色生日。"""
         async for result in self._run(event, EventCommand, date):
+            yield result
+
+    @atelier.command("新作", alias={"今日新作", "new"})
+    async def new_releases(self, event: AstrMessageEvent):
+        """查今日首次发售的视觉小说，资料优先 Bangumi，不设评分门槛。"""
+        async for result in self._run(event, NewReleasesCommand):
             yield result
 
     @atelier.command("排行", alias={"榜单", "ranking"})

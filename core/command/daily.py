@@ -3,8 +3,7 @@
 与其它指令不同，这里没有消息事件可用（由定时任务触发），因此只继承
 Composer，产出一串图片 URL 交给 main.py 分发。
 
-作品与角色两块内容各自独立 try：其中一块检索失败时另一块照常推送，
-不会像上游那样一个异常吞掉整次推送。
+精选作品、精选生日、今日清单、今日新作分别组图；任一栏目失败不取消其余栏目。
 """
 
 from __future__ import annotations
@@ -17,21 +16,21 @@ from astrbot.api import logger
 from ..types import Base64, CacheGroup, CommandType, Layout
 from ..utils import (
     brief,
-    character_lines,
     paragraphs,
     parse_touchgal_details_async,
     plain_markup,
     vn_lines,
 )
 from ..utils.bangumi import match_lines, rating_data
-from .base import Composer, feature
+from .base import dossier, feature, section
+from .calendar import CalendarComposer
 
 _LOG = "[Gal工房]"
 
 _NO_INTRO = "TouchGal暂无该作品简介。"
 
 
-class DailyDigest(Composer):
+class DailyDigest(CalendarComposer):
     """构建当天的推送图片。"""
 
     async def build(self) -> list[str]:
@@ -41,10 +40,18 @@ class DailyDigest(Composer):
         stamp = f"{now.year}年{now.month}月{now.day}日"
 
         urls: list[str] = []
-        for name, builder in (
-            ("纪念日作品", self._build_event_vn),
-            ("生日角色", self._build_event_cha),
-        ):
+        self._birthday_ids: set[str] = set()
+        schedule = self.settings.schedule
+        builders = []
+        if schedule.featured:
+            builders.extend(
+                (("精选纪念日作品", self._build_event_vn), ("精选生日角色", self._build_event_cha))
+            )
+        if schedule.calendar:
+            builders.append(("今日清单", self._build_calendar))
+        if schedule.new_releases:
+            builders.append(("今日新作", self._build_new_releases))
+        for name, builder in builders:
             try:
                 url = await builder(date, stamp)
             except Exception as error:
@@ -103,16 +110,36 @@ class DailyDigest(Composer):
         return await self.render(Layout.FEATURE, data)
 
     async def _build_event_cha(self, date: Sequence[str], stamp: str) -> str:
-        character, vns = await self.runtime.vndb.request_by_event_cha(date)
-        cover = (await self.vndb_covers([character]))[0]
-        data = feature(
-            main_image=cover,
-            subtitle=character.display_name,
-            info=character_lines(
-                character, options=self.settings.character.options, ignore_vns=True
-            ),
-            title=f"{stamp} · 今日生日",
-            cards_title="登场作品",
-            cards=await self.vn_cards(vns),
-        )
-        return await self.render(Layout.FEATURE, data)
+        characters, vns = await self.runtime.vndb.request_by_event_cha(date)
+        cards = await self.birthday_cards(characters, works=vns)
+        if len(cards) == 1:
+            data = feature(
+                main_image=cards[0]["image"],
+                subtitle=cards[0]["subtitle"],
+                info=cards[0].get("desc", []),
+                title=f"{stamp} · 今日生日精选",
+                cards_title="登场作品",
+                cards=await self.vn_cards(vns),
+            )
+            layout = Layout.FEATURE
+        else:
+            birthdays = section(text=(f"同作同日生日 · 共 {len(cards)} 位，一起祝福",), cards=cards)
+            birthdays["kind"] = "birthdays"
+            data = dossier(
+                sections=[birthdays, section(text=("登场作品",), cards=await self.vn_cards(vns))],
+                title=f"{stamp} · 今日生日精选",
+                subtitle="同一精选作品的寿星一起展示",
+            )
+            layout = Layout.DOSSIER
+        url = await self.render(layout, data)
+        # 只有成功生成精选卡才排除；精选失败时，清单仍可展示这些寿星。
+        self._birthday_ids = {item.id for item in characters}
+        return url
+
+    async def _build_calendar(self, date: Sequence[str], stamp: str) -> str:
+        data = await self.calendar_data(date, stamp, exclude=sorted(self._birthday_ids))
+        return await self.render(Layout.DOSSIER, data) if data else ""
+
+    async def _build_new_releases(self, date: Sequence[str], stamp: str) -> str:
+        data = await self.new_release_data(date, stamp)
+        return await self.render(Layout.DOSSIER, data) if data else ""

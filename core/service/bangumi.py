@@ -14,8 +14,8 @@ from urllib.parse import urlsplit
 
 from ..network.bangumi import Bangumi
 from ..settings import Settings
-from ..types import Tips, VndbVnResponse
-from ..types.bangumi import BangumiSubject
+from ..types import Tips, VndbCharacterResponse, VndbVnResponse
+from ..types.bangumi import BangumiCharacter, BangumiSubject
 
 _HOSTS = frozenset({"bgm.tv", "bangumi.tv", "chii.in", "www.bgm.tv", "www.bangumi.tv"})
 
@@ -148,6 +148,57 @@ class BangumiData:
         if not self.settings.bangumi.enabled or not self.settings.bangumi.enrich:
             return BangumiMatch(status="disabled")
         return await self._cached(f"match:{vn.id}", lambda: self._resolve(vn))
+
+    async def match_character(
+        self, character: VndbCharacterResponse, subjects: Sequence[BangumiSubject]
+    ) -> BangumiCharacter | None:
+        """只在可靠关联的作品内核对精确姓名；歧义、生日冲突或请求失败不补数据。"""
+        if not self.settings.bangumi.enabled or not self.settings.bangumi.enrich or not subjects:
+            return None
+        identifiers = sorted({item.id for item in subjects})
+        try:
+            return await self._cached(
+                f"character-match:{character.id}:{identifiers}",
+                lambda: asyncio.wait_for(
+                    self._resolve_character(character, identifiers),
+                    self.settings.bangumi.timeout + 4,
+                ),
+            )
+        except (Tips, asyncio.TimeoutError):
+            return None
+
+    async def _resolve_character(
+        self, character: VndbCharacterResponse, identifiers: Sequence[int]
+    ) -> BangumiCharacter | None:
+        keys = {
+            title_key(name)
+            for name in [character.name, character.original or "", *(character.aliases or [])]
+            if title_key(name)
+        }
+        candidates: dict[int, BangumiCharacter] = {}
+        for identifier in identifiers:
+            items = await self._cached(
+                f"subject-characters:{identifier}",
+                lambda identifier=identifier: self.client.subject_characters(identifier),
+            )
+            for item in items:
+                if keys.intersection(map(title_key, item.names)):
+                    candidates[item.id] = item
+        if len(candidates) != 1:
+            return None
+        identifier = next(iter(candidates))
+        item = await self._cached(
+            f"character:{identifier}", lambda: self.client.character(identifier)
+        )
+        if not item or not keys.intersection(map(title_key, item.names)):
+            return None
+        if character.birthday and len(character.birthday) >= 2:
+            month, day = character.birthday[:2]
+            if (item.birth_mon and item.birth_mon != month) or (
+                item.birth_day and item.birth_day != day
+            ):
+                return None
+        return item
 
     async def _resolve(self, vn: VndbVnResponse) -> BangumiMatch:
         try:

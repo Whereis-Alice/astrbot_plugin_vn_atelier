@@ -28,6 +28,7 @@ from .download import DownloadCommand
 from .event import EventCommand
 from .find import FindCommand
 from .helpcard import HelpCommand
+from .new_releases import NewReleasesCommand
 from .producer import ProducerCommand
 from .random_vn import RandomCommand
 from .ranking import RankingCommand
@@ -50,6 +51,7 @@ __all__ = [
     "EventCommand",
     "FindCommand",
     "HelpCommand",
+    "NewReleasesCommand",
     "ProducerCommand",
     "PushCommand",
     "RandomCommand",

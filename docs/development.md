@@ -8,6 +8,7 @@
 python tests/test_smoke.py     # 也可以用 pytest tests
 python tests/test_bangumi.py   # Bangumi 数据、匹配、HTTP 及推送管线的离线回归
 python tests/test_docs.py      # 文档链接、工具清单与 README 内容边界
+python tests/test_daily.py     # 独立栏目、同作寿星、日期过滤、清单与新作回归
 ```
 
 它会导入全部模块、校验模板锚点与主题／版式清单、把各种畸形配置喂给设置解析器，
@@ -15,7 +16,10 @@ python tests/test_docs.py      # 文档链接、工具清单与 README 内容边
 并确认用户数据里的 `<script>` 无法越出页面。
 Bangumi 回归覆盖跨站外链／别名、同名歧义与续作拒绝、无评分、限流冷却、取消共享请求、榜单门槛及每日推送；HTTP 测试仅连接本机临时端口，不访问第三方站点。
 文档检查确认相对链接、图片和锚点有效，并核对 LLM 工具清单、返回上限及配置开关，避免说明与实现脱节。
+每日回归覆盖同作寿星补齐、成功精选后去重、独立图片、配置数量、闰日、首发日期、资料关联及无评分回退；不访问生产服务器。
 提 PR 前请顺手跑一下 `ruff check .` 与 `ruff format .`。
+
+可选运行 `python tests/render_daily_previews.py`，需要另装 Playwright 及 Chromium（仅开发预览需要，不是插件的新运行依赖）。脚本使用合成数据、程序绘制封面与头像，在四套主题中检查横向溢出，并生成清单、新作、同作寿星的示例图。
 
 `extras/` 目录放的是可选的外部组件，不会被插件加载，也不参与自检 —— 目前有一个
 [Cloudflare Worker 组件](../extras/cf-worker-relay/)，可用于处理 TouchGal 的浏览器验证，不保证可用，也不参与 Bangumi 查询。

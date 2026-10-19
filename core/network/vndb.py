@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import random
 from collections.abc import Sequence
+from datetime import date as Date
 from typing import Any
 
 from ..settings import Settings
@@ -27,7 +28,7 @@ from .http import Http
 _KANA = "https://api.vndb.org/kana/"
 
 _EVENT_RESULTS = 12
-"""简讯每类最多展示的条目数。上游没传 results，只能拿到默认的 10 条。"""
+"""精选卡附属作品、登场角色的条目数；独立清单数量由配置控制。"""
 
 _BIRTHDAY_POOL = 40
 """每日推送挑选生日角色时的候选池大小，之后再按性别在本地筛选。"""
@@ -236,43 +237,79 @@ class Vndb:
     # -- 纪念日 / 每日推送 -------------------------------------------------- #
 
     def _released_filters(self, date: Sequence[str]) -> list[list[Any]]:
-        """构造「历年同月同日」的发布日期过滤器。
-
-        上游写死了 range(1990, int(date[0]))：起始年份不可配置，而且右开
-        区间把当年整个排除掉了，今年发售的作品永远上不了纪念日。
-        """
+        """只查往年首发，今日首发由新作栏目处理；跳过平年的 2 月 29 日。"""
         year = int(date[0])
         start = min(self._settings.event.start_year, year)
-        return [["released", "=", f"{item}-{date[1]}-{date[2]}"] for item in range(start, year + 1)]
+        filters = []
+        for item in range(start, year):
+            try:
+                stamp = Date(item, int(date[1]), int(date[2])).isoformat()
+            except ValueError:
+                continue
+            filters.append(["released", "=", stamp])
+        return filters
+
+    async def request_anniversaries(
+        self, date: Sequence[str], *, limit: int = 12
+    ) -> list[VndbVnResponse]:
+        """纪念日清单不沿用精选的评分、热度门槛。"""
+        released = self._released_filters(date)
+        if not released:
+            return []
+        raw = await self._results_or_empty(
+            "vn",
+            {
+                "filters": ["or", *released],
+                "fields": VNDB_FIELDS["vn"],
+                "sort": "rating",
+                "reverse": True,
+                "results": max(1, min(limit, _MAX_RESULTS)),
+            },
+        )
+        return [VndbVnResponse.model_validate(item) for item in raw]
+
+    async def request_birthdays(
+        self, date: Sequence[str], *, limit: int = 12, exclude: Sequence[str] = ()
+    ) -> list[VndbCharacterResponse]:
+        """生日清单不限制性别、角色戏份或关联作品评分；排除已推送寿星后再取数量。"""
+        conditions: list[Any] = [["birthday", "=", [int(date[1]), int(date[2])]]]
+        conditions.extend(["id", "!=", item] for item in dict.fromkeys(exclude))
+        raw = await self._results_or_empty(
+            "character",
+            {
+                "filters": ["and", *conditions],
+                "fields": VNDB_FIELDS["character_event"],
+                "sort": "id",
+                "results": max(1, min(limit, _MAX_RESULTS)),
+            },
+        )
+        return [VndbCharacterResponse.model_validate(item) for item in raw]
+
+    async def request_new_releases(
+        self, date: Sequence[str], *, limit: int = 12
+    ) -> list[VndbVnResponse]:
+        """按 VN 条目的首次发售日查新作，不查移植/翻译等 release 记录。"""
+        stamp = Date(*(int(part) for part in date)).isoformat()
+        raw = await self._results_or_empty(
+            "vn",
+            {
+                "filters": ["released", "=", stamp],
+                "fields": VNDB_FIELDS["vn"],
+                "sort": "votecount",
+                "reverse": True,
+                "results": max(1, min(limit, _MAX_RESULTS)),
+            },
+        )
+        return [VndbVnResponse.model_validate(item) for item in raw]
 
     async def request_by_event(
         self, date: Sequence[str]
     ) -> tuple[list[VndbVnResponse], list[VndbCharacterResponse]]:
-        """查询某天的「发售纪念日作品」与「生日角色」。"""
-        released = self._released_filters(date)
-        rating = self._settings.event.rating
-        vn_payload = {
-            "filters": ["and", ["or", *released], ["rating", ">=", rating]],
-            "fields": VNDB_FIELDS["vn_short"],
-            "sort": "rating",
-            "reverse": True,
-            "results": _EVENT_RESULTS,
-        }
-        cha_payload = {
-            "filters": [
-                "and",
-                ["birthday", "=", [int(date[1]), int(date[2])]],
-                ["vn", "=", ["rating", ">=", rating]],
-            ],
-            "fields": VNDB_FIELDS["character_event"],
-            "results": _EVENT_RESULTS,
-        }
-        vn_raw, cha_raw = await asyncio.gather(
-            self._results_or_empty("vn", vn_payload),
-            self._results_or_empty("character", cha_payload),
+        """兼容入口：清单不再继承精选质量门槛，数量由每日清单设置决定。"""
+        vns, characters = await asyncio.gather(
+            self.request_anniversaries(date, limit=self._settings.schedule.anniversary_count),
+            self.request_birthdays(date, limit=self._settings.schedule.birthday_count),
         )
-        vns = [VndbVnResponse.model_validate(item) for item in vn_raw]
-        characters = [VndbCharacterResponse.model_validate(item) for item in cha_raw]
         if not vns and not characters:
             raise NoResultException(CommandType.EVENT, "-".join(date))
         return vns, characters
@@ -282,6 +319,8 @@ class Vndb:
     ) -> tuple[VndbVnResponse, list[VndbCharacterResponse]]:
         """挑出当天最值得推送的一部纪念日作品，并附带其主要角色。"""
         released = self._released_filters(date)
+        if not released:
+            raise NoResultException(CommandType.EVENT_TIMED, "/".join(date))
         content = self._settings.schedule.content
         scope: list[Any] = ["or", *released]
         payload = {
@@ -312,13 +351,8 @@ class Vndb:
 
     async def request_by_event_cha(
         self, date: Sequence[str]
-    ) -> tuple[VndbCharacterResponse, list[VndbVnResponse]]:
-        """挑出当天最值得推送的一位生日角色，并附带其全部出场作品。
-
-        上游这段有两个硬伤：for 循环里 return、却又指望 else 分支去抛
-        「检索失败」，结果 else 永远不会执行；以及直接遍历 character.vns，
-        VNDB 返回 null 时抛 TypeError。这里改成显式的映射查找。
-        """
+    ) -> tuple[list[VndbCharacterResponse], list[VndbVnResponse]]:
+        """先按原有口味选作品，再取该作品全部同日寿星，避免同作漏人。"""
         stamp = "/".join(date)
         month, day = int(date[1]), int(date[2])
         raw = await self._results_or_empty(
@@ -343,15 +377,12 @@ class Vndb:
             filtered = [item for item in characters if item.sex and item.sex[0] == wanted]
             characters = filtered or characters
 
-        owner_of_vn: dict[str, str] = {}
-        for character in characters:
-            for vn in character.vns or []:
-                owner_of_vn.setdefault(vn.id, character.id)
-        if not owner_of_vn:
+        candidate_vns = {vn.id for character in characters for vn in character.vns or []}
+        if not candidate_vns:
             raise NoResultException(CommandType.EVENT_TIMED, stamp)
 
         content = self._settings.schedule.content
-        scope: list[Any] = ["or", *[["id", "=", item] for item in owner_of_vn]]
+        scope: list[Any] = ["or", *[["id", "=", item] for item in sorted(candidate_vns)]]
         best = await self._results_or_empty(
             "vn",
             {
@@ -365,12 +396,42 @@ class Vndb:
         if not best:
             raise NoResultException(CommandType.EVENT_TIMED, stamp)
 
-        chosen_id = owner_of_vn.get(str(best[0].get("id") or ""))
-        chosen = next((item for item in characters if item.id == chosen_id), None)
-        if chosen is None:
+        selected_vn = str(best[0].get("id") or "")
+        chosen: dict[str, VndbCharacterResponse] = {}
+        # 内部分页只用于补齐同作寿星，不影响用户端「一张图、不翻页」。
+        for page in range(1, 11):
+            response = await self._post(
+                "character",
+                {
+                    "filters": [
+                        "and",
+                        ["birthday", "=", [month, day]],
+                        ["vn", "=", ["id", "=", selected_vn]],
+                    ],
+                    "fields": VNDB_FIELDS["character"],
+                    "sort": "id",
+                    "results": _MAX_RESULTS,
+                    "page": page,
+                },
+            )
+            for item in response.get("results") or []:
+                character = VndbCharacterResponse.model_validate(item)
+                chosen[character.id] = character
+            if not response.get("more"):
+                break
+        else:
+            raise ResponseException("同作生日角色超过查询安全上限")
+        if not chosen:
             raise NoResultException(CommandType.EVENT_TIMED, stamp)
 
-        own_vns = [key for key, value in owner_of_vn.items() if value == chosen.id]
+        own_vns = list(
+            dict.fromkeys(
+                [
+                    selected_vn,
+                    *[vn.id for character in chosen.values() for vn in character.vns or []],
+                ]
+            )
+        )
         vns_raw = await self._results_or_empty(
             "vn",
             {
@@ -381,4 +442,6 @@ class Vndb:
                 "results": _EVENT_RESULTS,
             },
         )
-        return chosen, [VndbVnResponse.model_validate(item) for item in vns_raw]
+        vns = [VndbVnResponse.model_validate(item) for item in vns_raw]
+        vns.sort(key=lambda vn: vn.id != selected_vn)
+        return list(chosen.values()), vns

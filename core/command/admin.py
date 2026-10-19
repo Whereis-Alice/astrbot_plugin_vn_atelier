@@ -124,6 +124,21 @@ class PushCommand(BaseCommand):
     command = CommandType.HELP
     cooldown: ClassVar[bool] = False
 
+    def _columns(self) -> str:
+        schedule = self.settings.schedule
+        return (
+            "、".join(
+                label
+                for label, enabled in (
+                    ("每日精选", schedule.featured),
+                    ("今日清单", schedule.calendar),
+                    ("今日新作", schedule.new_releases),
+                )
+                if enabled
+            )
+            or "全部关闭（请先在插件配置开启栏目）"
+        )
+
     async def execute(self, value: str) -> AsyncIterator[MessageEventResult]:
         raw = value.strip()
         umo = self.event.unified_msg_origin
@@ -135,7 +150,7 @@ class PushCommand(BaseCommand):
                 "" if schedule.use_subscription else "（注意：当前配置为按白名单推送，订阅不生效）"
             )
             yield self.text(
-                f"已开启每日简讯推送，每天 {schedule.push_time} 送达。{hint}"
+                f"已订阅每日推送，计划每天 {schedule.push_time} 查询后分别发图。\n栏目：{self._columns()}。{hint}"
                 if added
                 else "本会话已经订阅过了。"
             )
@@ -152,5 +167,6 @@ class PushCommand(BaseCommand):
             f"每日简讯：{'已订阅' if subscribed else '未订阅'}\n"
             f"推送时间：{schedule.push_time}\n"
             f"推送模式：{mode}\n"
+            f"推送栏目：{self._columns()}\n"
             "发送「工房 推送 开启」或「工房 推送 关闭」调整。"
         )

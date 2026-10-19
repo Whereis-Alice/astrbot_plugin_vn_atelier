@@ -21,6 +21,7 @@ class Image(BaseModel):
     """VNDB 图片对象。"""
 
     url: str
+    sexual: float | None = None
 
 
 class Developer(BaseModel):

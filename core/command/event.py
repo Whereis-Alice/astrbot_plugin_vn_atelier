@@ -12,7 +12,8 @@ from datetime import datetime
 from astrbot.api.event import MessageEventResult
 
 from ..types import JA_WEEKDAYS, CommandType, NoResultException
-from .base import BaseCommand, dossier, section
+from .base import BaseCommand
+from .calendar import CalendarComposer
 
 
 class EventCommand(BaseCommand):
@@ -35,29 +36,9 @@ class EventCommand(BaseCommand):
             month, day = now.month, now.day
 
         date = [str(now.year), f"{month:02d}", f"{day:02d}"]
-        vns, characters = await self.runtime.vndb.request_by_event(date)
-        if not vns and not characters:
-            raise NoResultException(self.command, f"{month}-{day}")
-
-        blocks = []
-        if vns:
-            blocks.append(
-                section(
-                    text=("今天是这些作品的发布纪念日",),
-                    cards=await self.vn_cards(vns),
-                )
-            )
-        if characters:
-            blocks.append(
-                section(
-                    text=("今天是这些角色的生日",),
-                    cards=await self.character_cards(characters),
-                )
-            )
-
-        data = dossier(
-            sections=blocks,
-            title=self._title(now.year, month, day),
-            subtitle="今日简讯",
+        data = await CalendarComposer(self.runtime).calendar_data(
+            date, self._title(now.year, month, day)
         )
+        if not data:
+            raise NoResultException(self.command, f"{month}-{day}")
         yield await self.picture(data)

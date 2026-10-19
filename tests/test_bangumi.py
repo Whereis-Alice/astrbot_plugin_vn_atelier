@@ -425,7 +425,12 @@ class NetworkTests(unittest.IsolatedAsyncioTestCase):
                 "rating_count": [">=100"],
             },
         )
-        self.assertIn("GalAtelier/4.0.1", request["headers"]["User-Agent"])
+        version = next(
+            line.split(":", 1)[1].strip().removeprefix("v")
+            for line in (ROOT / "metadata.yaml").read_text(encoding="utf-8").splitlines()
+            if line.startswith("version:")
+        )
+        self.assertIn(f"GalAtelier/{version}", request["headers"]["User-Agent"])
         self.assertNotIn("Authorization", request["headers"])
 
     async def test_token_nsfw_and_game_type(self):
