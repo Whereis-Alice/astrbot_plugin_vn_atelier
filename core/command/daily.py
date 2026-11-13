@@ -148,6 +148,7 @@ class DailyDigest(CalendarComposer):
                 title=f"{stamp} · 今日生日精选",
                 cards_title="登场作品",
                 cards=await self.vn_cards(vns),
+                image_top=True,
             )
             layout = Layout.FEATURE
         else:

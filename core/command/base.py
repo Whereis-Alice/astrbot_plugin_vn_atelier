@@ -75,9 +75,12 @@ def card(
     desc: Sequence[str] = (),
     badge: str = "",
     ratings: Sequence[Mapping[str, Any]] = (),
+    image_top: bool = False,
 ) -> dict[str, Any]:
     """一张封面卡：左图右文。"""
     result: dict[str, Any] = {"image": image}
+    if image_top:
+        result["image_top"] = True
     if subtitle:
         result["subtitle"] = subtitle
     lines = _clean(desc)
@@ -155,6 +158,7 @@ def feature(
     cards: Sequence[Mapping[str, Any]] = (),
     ratings: Sequence[Mapping[str, Any]] = (),
     distribution: Sequence[Mapping[str, Any]] = (),
+    image_top: bool = False,
 ) -> dict[str, Any]:
     """特写：大封面 + 简介 + 预览图，用于单个作品的详情。"""
     result: dict[str, Any] = {
@@ -162,6 +166,8 @@ def feature(
         "subtitle": subtitle,
         "info": _clean(info),
     }
+    if image_top:
+        result["image_top"] = True
     if ratings:
         result["ratings"] = list(ratings)
     if distribution:
@@ -323,6 +329,7 @@ class Composer:
                 image=image,
                 subtitle=character.display_name,
                 desc=character_lines(character, options=options, ignore_vns=ignore_vns),
+                image_top=True,
             )
             for character, image in zip(results, images, strict=True)
         ]
@@ -350,6 +357,7 @@ class Composer:
             desc=desc,
             previews=previews,
             ratings=head.get("ratings") or [],
+            image_top=bool(head.get("image_top")),
         )
 
     async def vn_view(

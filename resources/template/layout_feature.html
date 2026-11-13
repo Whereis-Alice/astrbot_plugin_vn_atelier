@@ -4,7 +4,7 @@
     简介排在右栏封面旁边而不是整幅下方：封面高度固定，简介长短不定，
     这样短简介不会在封面右侧留下一大块空白。 -#}
       <div class="ft-top">
-        {% if main_image %}<img class="ft-cover" src="{{ main_image | safe }}" alt="">{% endif %}
+        {% if main_image %}<img class="ft-cover{% if image_top %} image--top{% endif %}" src="{{ main_image | safe }}" alt="">{% endif %}
         <div class="ft-main">
           {% if subtitle %}<h2 class="ft-name">{{ subtitle | safe }}</h2>{% endif %}
           {{ vna_ratings(ratings) }}

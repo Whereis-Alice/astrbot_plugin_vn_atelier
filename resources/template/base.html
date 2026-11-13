@@ -218,6 +218,9 @@ img { display: block; max-width: 100%; }
   background: var(--bg);
 }
 
+/* 长立绘从头部向下展示，完整缩放的小人设图也贴顶对齐。 */
+.image--top { object-position: center top; }
+
 .card__body { flex: 1 1 auto; min-width: 0; }
 
 .card__badge {
@@ -535,7 +538,7 @@ img { display: block; max-width: 100%; }
 {% endmacro %}
 {% macro vna_card(c) %}
       <article class="card">
-        {% if c.image %}<img class="card__cover" src="{{ c.image | safe }}" alt="">{% endif %}
+        {% if c.image %}<img class="card__cover{% if c.image_top %} image--top{% endif %}" src="{{ c.image | safe }}" alt="">{% endif %}
         <div class="card__body">
           {% if c.badge %}<span class="card__badge">{{ c.badge | safe }}</span>{% endif %}
           {% if c.subtitle %}<h2 class="card__title">{{ c.subtitle | safe }}</h2>{% endif %}

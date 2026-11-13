@@ -145,6 +145,7 @@ class CalendarComposer(Composer):
                 image=image,
                 subtitle=bgm.display_name if bgm else character.display_name,
                 desc=lines,
+                image_top=True,
             )
 
         return list(await asyncio.gather(*(one(character) for character in characters)))

@@ -116,6 +116,7 @@ class FindCommand(BaseCommand):
                         image=images[cursor],
                         subtitle=result.display_name,
                         desc=character_lines(result, ignore_extra=True),
+                        image_top=True,
                     )
                 )
                 cursor += 1
